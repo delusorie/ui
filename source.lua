@@ -2392,15 +2392,6 @@ local Library = { } do
             Z = 1
         })
 
-        Items.SubBar = MakeFrame({
-            Parent = Items.Root.Instance,
-            Pos = UDim2.fromOffset(SubX, SubY),
-            Size = UDim2.fromOffset(SubW, SubH),
-            Color = "Section",
-            Round = 10,
-            Clip = true,
-            Z = 20
-        })
 
         Items.TopBar = MakeFrame({
             Parent = Items.Main.Instance,
@@ -2408,6 +2399,16 @@ local Library = { } do
             Color = "Section",
             Round = 10,
             Z = 2
+        })
+
+        Items.SubBar = MakeFrame({
+            Parent = Items.TopBar.Instance,
+            Pos = UDim2.fromOffset(W - SubW, 0),
+            Size = UDim2.fromOffset(SubW, SubH),
+            Color = "Section",
+            Round = 10,
+            Clip = true,
+            Z = 20
         })
 
         MakeFrame({
