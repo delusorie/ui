@@ -2334,9 +2334,9 @@ local Library = { } do
         local MainX = RailW + Gap
         local RailY = math.floor((H - RailH) / 2)
         local SubX = MainX + math.floor((W - SubW) / 2)
-        local SubY = H - math.floor(SubH / 2)
+        local SubY = -math.floor(SubH / 2)
         local RootW = MainX + W
-        local RootH = SubY + SubH
+        local RootH = H
         local ColW = math.floor((W - 46) / 2)
         local Col2X = ColW + 16
         local SubCenterX = MainX + math.floor(W / 2)
@@ -2998,7 +2998,7 @@ Items.ProfileCard = MakeFrame({
 
             local Overflow = Content > MaxSubW
             local Target = math.min(Content, MaxSubW)
-            local NewX = SubCenterX - math.floor(Target / 2)
+            local NewX = MainX + W - Target - 8
 
             local Info = Instant and TweenInfo.new(0)
             or TweenInfo.new(0.24, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
@@ -6408,5 +6408,5 @@ Items.ProfileCard = MakeFrame({
 
     getgenv().diarian = Library
 end
-
+    
 return Library
