@@ -2484,46 +2484,24 @@ local Library = { } do
         end
 
         -- ── Profile card · bottom-left of Root ───────────────────────
-local ProfCardW  = 52
-local ProfCardY  = RailY + RailH + 6
+local ProfCardW  = 60
+local ProfCardY  = RailY + RailH + 10
 
 Items.ProfileCard = MakeFrame({
     Parent = Items.Root.Instance,
-    Pos    = UDim2.fromOffset(4, ProfCardY),
-    Size   = UDim2.fromOffset(ProfCardW, 52),
+    Pos    = UDim2.fromOffset(0, ProfCardY),
+    Size   = UDim2.fromOffset(RailW, 48),
     Color  = "Section",
     Round  = 10,
     Z      = 4
 })
 
-        MakeText({
-            Parent   = Items.ProfileCard.Instance,
-            Text     = LocalPlayer.DisplayName,
-            TextSize = 13,
-            Pos      = UDim2.fromOffset(8, 7),
-            Size     = UDim2.fromOffset(103, 18),
-            Color    = "Text",
-            Truncate = true,
-            Z        = 5
-        })
-
-        MakeText({
-            Parent   = Items.ProfileCard.Instance,
-            Text     = "by faintbound",
-            TextSize = 11,
-            Pos      = UDim2.fromOffset(8, 27),
-            Size     = UDim2.fromOffset(103, 15),
-            Color    = "DimText",
-            Truncate = true,
-            Z        = 5
-        })
-
         Items.Avatar = MakeAvatar(Items.ProfileCard.Instance, {
-            Anchor = Vector2.new(1, 0.5),
-            Pos    = UDim2.new(1, -8, 0.5, 0),
-            Size   = 34,
+            Anchor = Vector2.new(0.5, 0.5),
+            Pos    = UDim2.new(0.5, 0, 0.5, 0),
+            Size   = 32,
             Res    = 60,
-            Round  = 17,
+            Round  = 16,
             Z      = 5
         })
 
