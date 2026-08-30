@@ -201,16 +201,16 @@ local Library = { } do
     Library.WindowHeight = 540
 
     Library.Theme = {
-        Background = Color3.fromRGB(20, 22, 26),
-        Section = Color3.fromRGB(23, 26, 30),
-        Element = Color3.fromRGB(27, 31, 35),
-        Light = Color3.fromRGB(34, 39, 44),
-        Hover = Color3.fromRGB(38, 43, 49),
-        Line = Color3.fromRGB(27, 31, 35),
-        Text = Color3.fromRGB(255, 255, 255),
-        DimText = Color3.fromRGB(120, 120, 120),
-        DimIcon = Color3.fromRGB(120, 120, 120),
-        Accent = Color3.fromRGB(179, 165, 255)
+        Background = Color3.fromRGB(16, 20, 30),
+        Section    = Color3.fromRGB(20, 25, 37),
+        Element    = Color3.fromRGB(25, 31, 46),
+        Light      = Color3.fromRGB(33, 41, 60),
+        Hover      = Color3.fromRGB(39, 48, 70),
+        Line       = Color3.fromRGB(25, 31, 46),
+        Text       = Color3.fromRGB(230, 238, 255),
+        DimText    = Color3.fromRGB(108, 122, 148),
+        DimIcon    = Color3.fromRGB(108, 122, 148),
+        Accent     = Color3.fromRGB(80, 140, 255)
     }
 
     Library.AccentPresets = {
@@ -238,15 +238,15 @@ local Library = { } do
         MakePreset("Default", Library.Theme),
         MakePreset("Azure", {
             Background = Color3.fromRGB(16, 20, 30),
-            Section = Color3.fromRGB(20, 25, 37),
-            Element = Color3.fromRGB(25, 31, 46),
-            Light = Color3.fromRGB(33, 41, 60),
-            Hover = Color3.fromRGB(39, 48, 70),
-            Line = Color3.fromRGB(25, 31, 46),
-            Text = Color3.fromRGB(233, 239, 250),
-            DimText = Color3.fromRGB(110, 120, 142),
-            DimIcon = Color3.fromRGB(110, 120, 142),
-            Accent = Color3.fromRGB(96, 150, 255)
+            Section    = Color3.fromRGB(20, 25, 37),
+            Element    = Color3.fromRGB(25, 31, 46),
+            Light      = Color3.fromRGB(33, 41, 60),
+            Hover      = Color3.fromRGB(39, 48, 70),
+            Line       = Color3.fromRGB(25, 31, 46),
+            Text       = Color3.fromRGB(230, 238, 255),
+            DimText    = Color3.fromRGB(108, 122, 148),
+            DimIcon    = Color3.fromRGB(108, 122, 148),
+            Accent     = Color3.fromRGB(80, 140, 255)
         }),
         MakePreset("Emerald", {
             Background = Color3.fromRGB(14, 24, 20),
@@ -2366,9 +2366,9 @@ local Library = { } do
         Items.Root = MakeFrame({
             Parent = Library.Holder.Instance,
             Pos = UDim2.fromOffset(
-                Viewport.X / (2 * Scale) - RootW / 2,
-                Viewport.Y / (2 * Scale) - RootH / 2
-            ),
+            Viewport.X / (2 * Scale) - RootW / 2,
+            (Viewport.Y - GuiInset) / (2 * Scale) - RootH / 2
+        ),
             Size = UDim2.fromOffset(RootW, RootH),
             Z = 1
         })
@@ -2463,45 +2463,7 @@ local Library = { } do
             Z = 4
         })
 
-        Items.Username = MakeText({
-            Parent = Items.TopBar.Instance,
-            Text = LocalPlayer.DisplayName,
-            TextSize = 15,
-            Anchor = Vector2.new(1, 0),
-            Pos = UDim2.new(1, -56, 0, 8),
-            Size = UDim2.fromOffset(240, 18),
-            Color = "Text",
-            Align = Enum.TextXAlignment.Right,
-            Truncate = true,
-            Z = 3
-        })
-
-        Items.Version = MakeFrame({
-            Parent = Items.TopBar.Instance,
-            Anchor = Vector2.new(1, 0),
-            Pos = UDim2.new(1, -56, 0, 29),
-            Size = UDim2.fromOffset(36, 14),
-            Color = "Background",
-            Round = 3,
-            Z = 3
-        })
-
-        Library:Create("UIStroke", {
-            Parent = Items.Version.Instance,
-            Color = Library.Theme.Element,
-            Thickness = 1
-        }):AddToTheme({ Color = "Element" })
-
-        MakeText({
-            Parent = Items.Version.Instance,
-            Text = "v" .. Library.Version,
-            TextSize = 12,
-            Size = UDim2.new(1, 0, 1, 0),
-            Color = "DimText",
-            Align = Enum.TextXAlignment.Center,
-            Z = 4
-        })
-
+        -- ── MakeAvatar helper ──────────────────────────────────────
         local function MakeAvatar(Parent, Props)
             local Avatar = Library:Create("ImageLabel", {
                 Parent = Parent,
@@ -2521,21 +2483,53 @@ local Library = { } do
             return Avatar
         end
 
-        Items.Avatar = MakeAvatar(Items.TopBar.Instance, {
+        -- ── Profile card · bottom-left of Root ───────────────────────
+local ProfCardW  = 52
+local ProfCardY  = RailY + RailH + 6
+
+Items.ProfileCard = MakeFrame({
+    Parent = Items.Root.Instance,
+    Pos    = UDim2.fromOffset(4, ProfCardY),
+    Size   = UDim2.fromOffset(ProfCardW, 52),
+    Color  = "Section",
+    Round  = 10,
+    Z      = 4
+})
+
+        MakeText({
+            Parent   = Items.ProfileCard.Instance,
+            Text     = LocalPlayer.DisplayName,
+            TextSize = 13,
+            Pos      = UDim2.fromOffset(8, 7),
+            Size     = UDim2.fromOffset(103, 18),
+            Color    = "Text",
+            Truncate = true,
+            Z        = 5
+        })
+
+        MakeText({
+            Parent   = Items.ProfileCard.Instance,
+            Text     = "by faintbound",
+            TextSize = 11,
+            Pos      = UDim2.fromOffset(8, 27),
+            Size     = UDim2.fromOffset(103, 15),
+            Color    = "DimText",
+            Truncate = true,
+            Z        = 5
+        })
+
+        Items.Avatar = MakeAvatar(Items.ProfileCard.Instance, {
             Anchor = Vector2.new(1, 0.5),
-            Pos = UDim2.new(1, -10, 0.5, 0),
-            Size = 30,
-            Res = 60,
-            Round = 20,
-            Z = 3
+            Pos    = UDim2.new(1, -8, 0.5, 0),
+            Size   = 34,
+            Res    = 60,
+            Round  = 17,
+            Z      = 5
         })
 
         Items.ProfileHit = MakeButton({
-            Parent = Items.TopBar.Instance,
-            Anchor = Vector2.new(1, 0),
-            Pos = UDim2.new(1, -4, 0, 8),
-            Size = UDim2.fromOffset(42, 36),
-            Z = 5
+            Parent = Items.ProfileCard.Instance,
+            Z      = 6
         })
 
         local Profile = {
@@ -2943,17 +2937,16 @@ local Library = { } do
         end)
 
         local function ProfilePlace(Extra)
-            local Root = Items.Root.Instance
-            local PScale = Library:GetScreenScale()
-            local X = Root.AbsolutePosition.X / PScale + 8
-            local RootBottom = (Root.AbsolutePosition.Y + RootH + GuiInset) / PScale
-            local Y = RootBottom - 272 - 10
+            local Card  = Items.ProfileCard.Instance
+            local Scale = Library:GetScreenScale()
+            local X = Card.AbsolutePosition.X / Scale
+            local Y = (Card.AbsolutePosition.Y + GuiInset - 272 - 10) / Scale
             return UDim2.fromOffset(X, Y + (Extra or 0))
         end
 
         RefreshProfilePos = function()
             if Profile.IsOpen then
-                ProfilePanel.Instance.Position = ProfilePlace(10)
+                ProfilePanel.Instance.Position = ProfilePlace(0)
             end
         end
 
@@ -5776,7 +5769,7 @@ local Library = { } do
             table.insert(PresetDots, Dot)
         end
 
-        PresetDots[1].Ring.Instance.Thickness = 2
+        PresetDots[2].Ring.Instance.Thickness = 2
 
         local ThemeCells = {
             { "Background", "Background" },
