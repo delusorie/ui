@@ -2403,7 +2403,7 @@ local Library = { } do
 
         Items.SubBar = MakeFrame({
             Parent = Items.TopBar.Instance,
-            Pos = UDim2.fromOffset(W - SubW, 0),
+            Pos = UDim2.fromOffset(W - SubW - 15, 0),
             Size = UDim2.fromOffset(SubW, SubH),
             Color = "Section",
             Round = 10,
