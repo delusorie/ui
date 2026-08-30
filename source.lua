@@ -2155,7 +2155,7 @@ local Library = { } do
 
         local Title = Params.Name or Params.Title or "Notification"
         local Content = Params.Description or Params.Content or ""
-        local Icon = Params.Icon or 78335785494551
+        local Icon = Params.Icon or 104824991042380
         local Accent = Params.Color or Library.Theme.Accent
         local Duration = Params.Duration or 5
 
@@ -2429,7 +2429,7 @@ local Library = { } do
 
         Items.HubIcon = MakeImage({
             Parent = Items.TopBar.Instance,
-            Icon = 78335785494551,
+            Icon = 104824991042380,
             Pos = UDim2.fromOffset(10, 10),
             Size = UDim2.fromOffset(30, 30),
             Raw = Color3.new(1, 1, 1),
