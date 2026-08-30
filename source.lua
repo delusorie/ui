@@ -4151,6 +4151,10 @@ Items.ProfileCard = MakeFrame({
                 Key = KParams.Default,
                 Mode = KParams.Mode or "Toggle",
                 Flag = KParams.Flag,
+                Callback = KParams.Callback,
+                Condition = KParams.Condition,
+                Independent = KParams.Independent or false,
+                Active = false,
                 Picking = false,
                 IsOpen = false,
                 Debounce = false
@@ -4247,7 +4251,24 @@ Items.ProfileCard = MakeFrame({
                 }
             end
 
+            function Keybind:SetActive(Bool)
+                Bool = Bool and true or false
+                if Keybind.Active == Bool then return end
+
+                Keybind.Active = Bool
+
+                if Keybind.Independent then
+                    Library:SafeCall(Keybind.Callback, Keybind.Active)
+                else
+                    Toggle:Set(Keybind.Active)
+                end
+            end
+
             function Keybind:SetMode(Mode, Instant)
+                if Keybind.Independent and Keybind.Active then
+                    Keybind:SetActive(false)
+                end
+
                 Keybind.Mode = Mode
 
                 for _, Data in ModeRows do
@@ -4292,7 +4313,15 @@ Items.ProfileCard = MakeFrame({
                 if Processed or Keybind.Picking or not Keybind.Key then return end
                 if not KeyMatches(Input, Keybind.Key) then return end
 
-                if Keybind.Mode == "Hold" then
+                if Keybind.Independent then
+                    if Keybind.Condition and not Keybind.Condition() then return end
+
+                    if Keybind.Mode == "Hold" then
+                        Keybind:SetActive(true)
+                    else
+                        Keybind:SetActive(not Keybind.Active)
+                    end
+                elseif Keybind.Mode == "Hold" then
                     Toggle:Set(true)
                 else
                     Toggle:Set(not Toggle.Value)
@@ -4303,7 +4332,11 @@ Items.ProfileCard = MakeFrame({
                 if Keybind.Mode ~= "Hold" or not Keybind.Key then return end
                 if not KeyMatches(Input, Keybind.Key) then return end
 
-                Toggle:Set(false)
+                if Keybind.Independent then
+                    Keybind:SetActive(false)
+                else
+                    Toggle:Set(false)
+                end
             end)
 
             if Keybind.Flag then
