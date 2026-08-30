@@ -2999,7 +2999,7 @@ Items.ProfileCard = MakeFrame({
 
             local Overflow = Content > MaxSubW
             local Target = math.min(Content, MaxSubW)
-            local NewX = MainX + W - Target - 8
+            local NewX = W - Target - 8
 
             local Info = Instant and TweenInfo.new(0)
             or TweenInfo.new(0.24, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
