@@ -373,10 +373,28 @@ local Library = { } do
         for _, Root in Roots do
             if not Root or not Root.Instance then continue end
 
-            for _, Child in Root.Instance:GetDescendants() do
-                if Library.Preloaded[Child] then continue end
-                if not Child:IsA("ImageLabel") and not Child:IsA("ImageButton") then continue end
-                if Child.Image == "" then continue end
+            local Ok, Descendants = pcall(function()
+                return Root.Instance:GetDescendants()
+            end)
+
+            if not Ok or type(Descendants) ~= "table" then
+                continue
+            end
+
+            for _, Child in Descendants do
+                local Valid, IsImage, Image = pcall(function()
+                    return
+                        Child:IsA("ImageLabel") or Child:IsA("ImageButton"),
+                        Child.Image
+                end)
+
+                if not Valid or not IsImage or Image == "" then
+                    continue
+                end
+
+                if Library.Preloaded[Child] then
+                    continue
+                end
 
                 Library.Preloaded[Child] = true
                 table.insert(Assets, Child)
@@ -862,8 +880,31 @@ local Library = { } do
         end)
     end
 
+    Library.ExternalConnections = Library.ExternalConnections or { }
+    Library.ExternalInstances = Library.ExternalInstances or { }
+
+    Library.RegisterExternalConnection = function(Self, Connection)
+        if Connection then
+            table.insert(Library.ExternalConnections, Connection)
+        end
+        return Connection
+    end
+
+    Library.RegisterExternalInstance = function(Self, Object)
+        if Object then
+            table.insert(Library.ExternalInstances, Object)
+        end
+        return Object
+    end
+
     Library.Unload = function(Self)
         for _, Connection in Library.Connections do
+            pcall(function()
+                Connection:Disconnect()
+            end)
+        end
+
+        for _, Connection in Library.ExternalConnections do
             pcall(function()
                 Connection:Disconnect()
             end)
@@ -873,9 +914,24 @@ local Library = { } do
             pcall(coroutine.close, Thread)
         end
 
-        for _, Root in { Library.Holder, Library.PopupHolder, Library.UnusedHolder } do
-            if Root then Root.Instance:Destroy() end
+        for _, Object in Library.ExternalInstances do
+            pcall(function()
+                Object:Destroy()
+            end)
         end
+
+        for _, Root in { Library.Holder, Library.PopupHolder, Library.UnusedHolder } do
+            if Root and Root.Instance then
+                pcall(function()
+                    Root.Instance:Destroy()
+                end)
+            end
+        end
+
+        table.clear(Library.Connections)
+        table.clear(Library.ExternalConnections)
+        table.clear(Library.ExternalInstances)
+        table.clear(Library.Threads)
 
         getgenv().diarian = nil
     end
