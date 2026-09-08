@@ -295,7 +295,7 @@ end
     end
 
     Library.__index = Library
-    Library.Version = "1.5.2-window-visible"
+    Library.Version = "1.5.3-subtab-visible"
     Library.IsMobile = IsMobile
     Library.DevicePlatform = DevicePlatform
     Library.WindowWidth = IsMobile and 640 or 716
@@ -4129,9 +4129,16 @@ Items.ProfileCard = MakeFrame({
         end
 
         Items.Hit:Connect("MouseButton1Down", function()
-            if Tab.Current == SubTab then return end
-
             Library:CloseAllPopups()
+
+            if Tab.Current == SubTab then
+                if not SubTab.Active or not Items.Page.Instance.Visible then
+                    SubTab:SetVisual(true)
+                    SubTab:Show()
+                    Window:LayoutSubBar()
+                end
+                return
+            end
 
             if Tab.Current then
                 Tab.Current:SetVisual(false)
@@ -4150,9 +4157,16 @@ Items.ProfileCard = MakeFrame({
         if #Tab.Subs == 1 then
             Tab.Current = SubTab
             SubTab:SetVisual(true, true)
-        end
 
-        if Window.Current == Tab then
+            if Window.Current == Tab then
+                task.defer(function()
+                    if Window.Current == Tab and Tab.Current == SubTab then
+                        SubTab:Show()
+                        Window:LayoutSubBar()
+                    end
+                end)
+            end
+        elseif Window.Current == Tab then
             Window:LayoutSubBar()
         end
 
