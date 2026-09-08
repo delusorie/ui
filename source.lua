@@ -295,7 +295,7 @@ end
     end
 
     Library.__index = Library
-    Library.Version = "1.5.1-working-capability"
+    Library.Version = "1.5.2-window-visible"
     Library.IsMobile = IsMobile
     Library.DevicePlatform = DevicePlatform
     Library.WindowWidth = IsMobile and 640 or 716
@@ -721,7 +721,12 @@ end
     end
 
     local function CollectFadeable(Root)
-        local Children = Root:GetDescendants()
+        local Children = { }
+
+        pcall(function()
+            Children = Root:GetDescendants()
+        end)
+
         table.insert(Children, Root)
         return Children
     end
@@ -2749,6 +2754,8 @@ end
             Z = 1
         })
 
+        Items.Root.Instance.Visible = true
+
         Items.Main = MakeFrame({
             Parent = Items.Root.Instance,
             Pos = UDim2.fromOffset(MainX, 0),
@@ -3448,14 +3455,17 @@ Items.ProfileCard = MakeFrame({
 
             local Sub = Window.Current and Window.Current.Current
             if Sub and Sub.SnapVisible then
-                Sub:SnapVisible()
+                pcall(function()
+                    Sub:SnapVisible()
+                end)
             end
 
-            if Bool and Window.PlayIntro then
-                Window:PlayIntro()
-            else
-                Items.Root:FadeDescendants(Bool)
-            end
+            pcall(function()
+                Items.Root:CancelFade()
+                Items.Root:ResetFade()
+            end)
+
+            Items.Root.Instance.Visible = Bool
         end
 
         Library:Connect(UserInputService.InputBegan, function(Input, Processed)
@@ -3530,20 +3540,17 @@ Items.ProfileCard = MakeFrame({
         end)
 
         function Window:PlayIntro()
-            local Base = Items.Root.Instance.Position
-            local Rise = TweenInfo.new(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
-
-            Items.Root.Instance.Position = UDim2.fromOffset(
-                Base.X.Offset,
-                Base.Y.Offset + 24
-            )
-
-            Items.Root:FadeDescendants(true)
-            Library:Tween({ Position = Base }, Rise, Items.Root.Instance)
+            Items.Root.Instance.Visible = true
+            Window.IsOpen = true
         end
 
         task.defer(function()
-            Window:PlayIntro()
+            pcall(function()
+                Window:Center()
+            end)
+
+            Items.Root.Instance.Visible = true
+            Window.IsOpen = true
         end)
 
         return setmetatable(Window, Library)
