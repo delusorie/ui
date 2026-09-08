@@ -19,8 +19,38 @@ local Library = { } do
     local ContentProvider = cloneref(game:GetService("ContentProvider"))
 
     local LocalPlayer = Players.LocalPlayer
-    local GuiInset = GuiService:GetGuiInset().Y
-    local IsMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+
+    local function GetGuiInsetY()
+        local Ok, TopLeft = pcall(function()
+            local TL = GuiService:GetGuiInset()
+            return TL.Y
+        end)
+        return Ok and TopLeft or 0
+    end
+
+    local GuiInset = GetGuiInsetY()
+
+    local DevicePlatform
+    pcall(function()
+        DevicePlatform = UserInputService:GetPlatform()
+    end)
+
+    local IsMobilePlatform =
+        DevicePlatform == Enum.Platform.Android
+        or DevicePlatform == Enum.Platform.IOS
+
+    local function ComputeMobileMode()
+        local Camera = workspace.CurrentCamera
+        local Viewport = Camera and Camera.ViewportSize or Vector2.new(1920, 1080)
+        local SmallScreen = math.min(Viewport.X, Viewport.Y) <= 700
+        return UserInputService.TouchEnabled and (
+            IsMobilePlatform
+            or not UserInputService.KeyboardEnabled
+            or SmallScreen
+        )
+    end
+
+    local IsMobile = ComputeMobileMode()
 
     local GetHui = gethui or function()
         return cloneref(game:GetService("CoreGui"))
@@ -196,9 +226,13 @@ local Library = { } do
     end
 
     Library.__index = Library
-    Library.Version = "1.1"
-    Library.WindowWidth = 716
-    Library.WindowHeight = 540
+    Library.Version = "1.2-responsive"
+    Library.IsMobile = IsMobile
+    Library.DevicePlatform = DevicePlatform
+    Library.WindowWidth = IsMobile and 640 or 716
+    Library.WindowHeight = IsMobile and 470 or 540
+    Library.MinMobileScale = 0.58
+    Library.MaxMobileScale = 1
 
     Library.Theme = {
         Background = Color3.fromRGB(16, 20, 30),
@@ -311,6 +345,9 @@ local Library = { } do
     Library.SetFlags = { }
     Library.Connections = { }
     Library.Threads = { }
+    Library.ExternalConnections = { }
+    Library.ExternalInstances = { }
+    Library.Destroyed = false
     Library.ThemingStuff = { }
     Library.ThemeMap = { }
     Library.AccentGradients = { }
@@ -341,13 +378,30 @@ local Library = { } do
             Instance = Instance.new(Class)
         }
 
+        local ParentValue
+
         for Property, Value in Properties do
-            if Property == "Name" then
-                Data.Instance.Name = "\0"
+            if Property == "Parent" then
+                ParentValue = Value
                 continue
             end
 
-            Data.Instance[Property] = Value
+            if Property == "Name" then
+                pcall(function()
+                    Data.Instance.Name = "\0"
+                end)
+                continue
+            end
+
+            pcall(function()
+                Data.Instance[Property] = Value
+            end)
+        end
+
+        if ParentValue ~= nil then
+            pcall(function()
+                Data.Instance.Parent = ParentValue
+            end)
         end
 
         if Class == "ImageLabel" or Class == "ImageButton" then
@@ -355,10 +409,62 @@ local Library = { } do
         end
 
         if Library.SeedBaseline then
-            Library:SeedBaseline(Data.Instance)
+            pcall(function()
+                Library:SeedBaseline(Data.Instance)
+            end)
         end
 
         return setmetatable(Data, Library)
+    end
+
+    local function SafeRect(Object)
+        if not Object then
+            return nil, nil
+        end
+
+        local Ok, Position, Size = pcall(function()
+            return Object.AbsolutePosition, Object.AbsoluteSize
+        end)
+
+        if not Ok then
+            return nil, nil
+        end
+
+        return Position, Size
+    end
+
+    local function SafeAbsoluteContentSize(Layout)
+        if not Layout then return nil end
+
+        local Ok, Size = pcall(function()
+            return Layout.AbsoluteContentSize
+        end)
+
+        return Ok and Size or nil
+    end
+
+    local function SafeIsDescendantOf(Object, Parent)
+        if not Object or not Parent then return false end
+
+        local Ok, Result = pcall(function()
+            return Object:IsDescendantOf(Parent)
+        end)
+
+        return Ok and Result or false
+    end
+
+    Library.RegisterExternalConnection = function(Self, Connection)
+        if Connection then
+            table.insert(Library.ExternalConnections, Connection)
+        end
+        return Connection
+    end
+
+    Library.RegisterExternalInstance = function(Self, Object)
+        if Object then
+            table.insert(Library.ExternalInstances, Object)
+        end
+        return Object
     end
 
     Library.PreloadAll = function(Self)
@@ -382,12 +488,15 @@ local Library = { } do
             end
 
             for _, Child in Descendants do
+                if Library.Preloaded[Child] then continue end
+
                 local Valid, IsImage, Image = pcall(function()
                     return Child:IsA("ImageLabel") or Child:IsA("ImageButton"), Child.Image
                 end)
 
-                if not Valid or not IsImage or Image == "" then continue end
-                if Library.Preloaded[Child] then continue end
+                if not Valid or not IsImage or Image == "" then
+                    continue
+                end
 
                 Library.Preloaded[Child] = true
                 table.insert(Assets, Child)
@@ -404,38 +513,65 @@ local Library = { } do
     end
 
     Library.Connect = function(Self, Signal, Callback)
+        if Library.Destroyed then return nil end
+
         local Connection
 
+        local function Track(Conn)
+            if Conn then
+                table.insert(Library.Connections, Conn)
+            end
+            return Conn
+        end
+
         if type(Signal) == "string" and Self.Instance then
+            local Object = Self.Instance
             local IsClick = Signal == "MouseButton1Down" or Signal == "MouseButton1Click"
 
-            if IsMobile and IsClick and Self.Instance:IsA("GuiButton") then
+            if IsMobile and IsClick and Object:IsA("GuiButton") then
                 local LastFire = 0
 
                 local function Fire(Input)
                     local Now = os.clock()
-                    if Now - LastFire < 0.25 then return end
+                    if Now - LastFire < 0.18 then return end
                     LastFire = Now
-                    Callback(Input)
+                    Library:SafeCall(Callback, Input)
                 end
 
                 table.insert(Library.TouchButtons, {
-                    Instance = Self.Instance,
+                    Instance = Object,
                     Fire = Fire
                 })
 
-                Connection = Self.Instance.Activated:Connect(function(Input)
-                    Fire(Input)
+                local Ok, Conn = pcall(function()
+                    return Object.Activated:Connect(Fire)
                 end)
+
+                if Ok then
+                    Connection = Conn
+                else
+                    Connection = Object[Signal]:Connect(Fire)
+                end
             else
-                Connection = Self.Instance[Signal]:Connect(Callback)
+                local Ok, Conn = pcall(function()
+                    return Object[Signal]:Connect(Callback)
+                end)
+
+                if Ok then
+                    Connection = Conn
+                end
             end
         else
-            Connection = Signal:Connect(Callback)
+            local Ok, Conn = pcall(function()
+                return Signal:Connect(Callback)
+            end)
+
+            if Ok then
+                Connection = Conn
+            end
         end
 
-        table.insert(Library.Connections, Connection)
-        return Connection
+        return Track(Connection)
     end
 
     Library.Thread = function(Self, Function)
@@ -770,6 +906,10 @@ local Library = { } do
     end
 
     Library.OnHover = function(Self, OnEnter, OnLeave)
+        if IsMobile then
+            return
+        end
+
         Library:Connect(Self.Instance.MouseEnter, OnEnter)
         Library:Connect(Self.Instance.MouseLeave, OnLeave)
     end
@@ -783,15 +923,8 @@ local Library = { } do
     end
 
     local function IsOverObject(Object)
-        if not Object then return false end
-
-        local Ok, Corner, Size = pcall(function()
-            return Object.AbsolutePosition, Object.AbsoluteSize
-        end)
-
-        if not Ok or not Corner or not Size then
-            return false
-        end
+        local Corner, Size = SafeRect(Object)
+        if not Corner or not Size then return false end
 
         local Position = UserInputService:GetMouseLocation() - Vector2.new(0, GuiInset)
 
@@ -818,27 +951,56 @@ local Library = { } do
     Library.MakeDraggable = function(Self, Handle)
         local Gui = Self.Instance
         Handle = Handle or Gui
-        Handle.Active = true
+        if not Gui or not Handle then return end
+
+        pcall(function()
+            Handle.Active = true
+        end)
 
         local Dragging = false
         local DragStart
         local StartPosition
         local InputChanged
 
+        local function GetParentAndGuiSize()
+            local _, ParentSize = SafeRect(Gui.Parent)
+            local _, GuiSize = SafeRect(Gui)
+
+            if not ParentSize or not GuiSize then
+                return nil, nil
+            end
+
+            local Scale = math.max(Library:GetScreenScale(), 0.001)
+            return ParentSize / Scale, GuiSize / Scale
+        end
+
         local function Set(Input)
-            local Scale = Library:GetScreenScale()
+            if not DragStart or not StartPosition then return end
+
+            local Scale = math.max(Library:GetScreenScale(), 0.001)
             local DragDelta = (Input.Position - DragStart) / Scale
             local NewX = StartPosition.X + DragDelta.X
             local NewY = StartPosition.Y + DragDelta.Y
 
-            local ScreenSize = Gui.Parent.AbsoluteSize / Scale
-            local GuiSize = Gui.AbsoluteSize / Scale
-            local Anchor = Gui.AnchorPoint
+            local ScreenSize, GuiSize = GetParentAndGuiSize()
+            if ScreenSize and GuiSize then
+                local Anchor = Gui.AnchorPoint
+                NewX = math.clamp(
+                    NewX,
+                    GuiSize.X * Anchor.X,
+                    math.max(ScreenSize.X - GuiSize.X * (1 - Anchor.X), GuiSize.X * Anchor.X)
+                )
+                NewY = math.clamp(
+                    NewY,
+                    GuiSize.Y * Anchor.Y,
+                    math.max(ScreenSize.Y - GuiSize.Y * (1 - Anchor.Y), GuiSize.Y * Anchor.Y)
+                )
+            end
 
-            NewX = math.clamp(NewX, GuiSize.X * Anchor.X, ScreenSize.X - GuiSize.X * (1 - Anchor.X))
-            NewY = math.clamp(NewY, GuiSize.Y * Anchor.Y, ScreenSize.Y - GuiSize.Y * (1 - Anchor.Y))
+            local Info = IsMobile
+                and TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+                or TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-            local Info = TweenInfo.new(0.14, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
             Self:Tween({ Position = UDim2.fromOffset(NewX, NewY) }, Info)
         end
 
@@ -852,8 +1014,11 @@ local Library = { } do
             Dragging = true
             DragStart = Input.Position
 
-            local Scale = Library:GetScreenScale()
-            local ParentSize = Gui.Parent.AbsoluteSize / Scale
+            local ParentSize = select(1, GetParentAndGuiSize())
+            if not ParentSize then
+                Dragging = false
+                return
+            end
 
             StartPosition = Vector2.new(
                 Gui.Position.X.Scale * ParentSize.X + Gui.Position.X.Offset,
@@ -862,13 +1027,22 @@ local Library = { } do
 
             if InputChanged then return end
 
-            InputChanged = Input.Changed:Connect(function()
-                if Input.UserInputState == Enum.UserInputState.End then
-                    Dragging = false
-                    InputChanged:Disconnect()
-                    InputChanged = nil
-                end
+            local Ok, Conn = pcall(function()
+                return Input.Changed:Connect(function()
+                    if Input.UserInputState == Enum.UserInputState.End then
+                        Dragging = false
+                        if InputChanged then
+                            InputChanged:Disconnect()
+                            InputChanged = nil
+                        end
+                    end
+                end)
             end)
+
+            if Ok then
+                InputChanged = Conn
+                Library:RegisterExternalConnection(Conn)
+            end
         end)
 
         Library:Connect(UserInputService.InputChanged, function(Input)
@@ -882,7 +1056,16 @@ local Library = { } do
     end
 
     Library.Unload = function(Self)
+        if Library.Destroyed then return end
+        Library.Destroyed = true
+
         for _, Connection in Library.Connections do
+            pcall(function()
+                Connection:Disconnect()
+            end)
+        end
+
+        for _, Connection in Library.ExternalConnections do
             pcall(function()
                 Connection:Disconnect()
             end)
@@ -890,11 +1073,31 @@ local Library = { } do
 
         for _, Thread in Library.Threads do
             pcall(coroutine.close, Thread)
+            pcall(task.cancel, Thread)
+        end
+
+        for _, Object in Library.ExternalInstances do
+            pcall(function()
+                Object:Destroy()
+            end)
         end
 
         for _, Root in { Library.Holder, Library.PopupHolder, Library.UnusedHolder } do
-            if Root then Root.Instance:Destroy() end
+            if Root and Root.Instance then
+                pcall(function()
+                    Root.Instance:Destroy()
+                end)
+            end
         end
+
+        table.clear(Library.Connections)
+        table.clear(Library.ExternalConnections)
+        table.clear(Library.ExternalInstances)
+        table.clear(Library.Threads)
+        table.clear(Library.TouchButtons)
+        table.clear(Library.TouchShields)
+        table.clear(Library.OpenFrames)
+        table.clear(Library.Windows)
 
         getgenv().diarian = nil
     end
@@ -935,9 +1138,12 @@ local Library = { } do
         })
 
         task.defer(function()
-            pcall(function()
-                GuiInset = -Probe.Instance.AbsolutePosition.Y
-            end)
+            local Position = select(1, SafeRect(Probe.Instance))
+            if Position then
+                GuiInset = -Position.Y
+            else
+                GuiInset = GetGuiInsetY()
+            end
 
             pcall(function()
                 Probe.Instance:Destroy()
@@ -1194,60 +1400,88 @@ local Library = { } do
     end
 
     local function UpdateScale()
-        local Scale = Library.UserScale
+        local Camera = workspace.CurrentCamera
+        if not Camera then return end
 
-        if IsMobile and workspace.CurrentCamera then
-            local Viewport = workspace.CurrentCamera.ViewportSize
-            local FitX = (Viewport.X * 0.94) / Library.WindowWidth
-            local FitY = (Viewport.Y * 0.9) / Library.WindowHeight
-            Scale = Scale * math.clamp(math.min(FitX, FitY), 0.3, 1)
+        IsMobile = ComputeMobileMode()
+        Library.IsMobile = IsMobile
+
+        local Viewport = Camera.ViewportSize
+        local Scale = math.clamp(tonumber(Library.UserScale) or 1, 0.5, 1.5)
+
+        if IsMobile then
+            local Portrait = Viewport.Y > Viewport.X
+            local SafeX = Portrait and 0.96 or 0.97
+            local SafeY = Portrait and 0.90 or 0.93
+
+            local FitX = (Viewport.X * SafeX) / Library.WindowWidth
+            local FitY = ((Viewport.Y - GuiInset) * SafeY) / Library.WindowHeight
+
+            local Fit = math.min(FitX, FitY)
+            Scale *= math.clamp(Fit, Library.MinMobileScale, Library.MaxMobileScale)
         end
 
-        local Old = Library.UIScale.Instance.Scale
+        local Old = 1
+        pcall(function()
+            Old = Library.UIScale.Instance.Scale
+        end)
+
         local Centers = { }
 
         for Index, Window in Library.Windows do
             local Root = Window.Items and Window.Items.Root
-            if not Root then continue end
+            if not Root or not Root.Instance then continue end
 
-            local Pos = Root.Instance.Position
-            local Size = Root.Instance.Size
+            local Ok, Pos, Size = pcall(function()
+                return Root.Instance.Position, Root.Instance.Size
+            end)
 
-            Centers[Index] = Vector2.new(
-                (Pos.X.Offset + Size.X.Offset / 2) * Old,
-                (Pos.Y.Offset + Size.Y.Offset / 2) * Old
-            )
+            if Ok then
+                Centers[Index] = Vector2.new(
+                    (Pos.X.Offset + Size.X.Offset / 2) * Old,
+                    (Pos.Y.Offset + Size.Y.Offset / 2) * Old
+                )
+            end
         end
 
-        Library.UIScale.Instance.Scale = Scale
-        Library.PopupScale.Instance.Scale = Scale
+        pcall(function()
+            Library.UIScale.Instance.Scale = Scale
+            Library.PopupScale.Instance.Scale = Scale
+        end)
 
         if IsMobile then
             for _, Window in Library.Windows do
-                if Window.Center then Window:Center() end
+                if Window.Center then
+                    pcall(function()
+                        Window:Center()
+                    end)
+                end
             end
-
             return
         end
-
-        local Viewport = workspace.CurrentCamera.ViewportSize
 
         for Index, Window in Library.Windows do
             local Root = Window.Items and Window.Items.Root
             local Center = Centers[Index]
+            if not Root or not Root.Instance or not Center then continue end
 
-            if not Root or not Center then continue end
+            local Ok, Size = pcall(function()
+                return Root.Instance.Size
+            end)
 
-            local Size = Root.Instance.Size
+            if not Ok then continue end
+
             local HalfX = Size.X.Offset / 2
             local HalfY = Size.Y.Offset / 2
             local LimitX = Viewport.X / Scale
-            local LimitY = Viewport.Y / Scale
+            local LimitY = (Viewport.Y - GuiInset) / Scale
 
             local NewX = math.clamp(Center.X / Scale - HalfX, 0, math.max(LimitX - HalfX * 2, 0))
             local NewY = math.clamp(Center.Y / Scale - HalfY, 0, math.max(LimitY - HalfY * 2, 0))
 
-            Root.Instance.Position = UDim2.fromOffset(NewX, NewY)
+            pcall(function()
+                Root.Instance.Position = UDim2.fromOffset(NewX, NewY)
+            end)
         end
     end
 
@@ -1259,21 +1493,38 @@ local Library = { } do
 
     UpdateScale()
 
-    Library:Connect(workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"), function()
-        task.wait()
-        UpdateScale()
+    local ViewportConnection
+
+    local function BindViewport()
+        if ViewportConnection then
+            pcall(function()
+                ViewportConnection:Disconnect()
+            end)
+            ViewportConnection = nil
+        end
+
+        local Camera = workspace.CurrentCamera
+        if not Camera then return end
+
+        ViewportConnection = Camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+            task.defer(UpdateScale)
+        end)
+
+        Library:RegisterExternalConnection(ViewportConnection)
+    end
+
+    BindViewport()
+
+    Library:Connect(workspace:GetPropertyChangedSignal("CurrentCamera"), function()
+        task.defer(function()
+            BindViewport()
+            UpdateScale()
+        end)
     end)
 
     local function PointInside(Position, Object)
-        if not Object then return false end
-
-        local Ok, Corner, Size = pcall(function()
-            return Object.AbsolutePosition, Object.AbsoluteSize
-        end)
-
-        if not Ok or not Corner or not Size then
-            return false
-        end
+        local Corner, Size = SafeRect(Object)
+        if not Corner or not Size then return false end
 
         return Position.X >= Corner.X
         and Position.X <= Corner.X + Size.X
@@ -1302,8 +1553,8 @@ local Library = { } do
             local ShieldLevel = 0
 
             for Panel, Level in Library.TouchShields do
-                local Live = Panel:IsDescendantOf(Library.Holder.Instance)
-                or Panel:IsDescendantOf(Library.PopupHolder.Instance)
+                local Live = SafeIsDescendantOf(Panel, Library.Holder.Instance)
+                or SafeIsDescendantOf(Panel, Library.PopupHolder.Instance)
 
                 if Live and PointInside(Position, Panel) then
                     ShieldLevel = math.max(ShieldLevel, Level)
@@ -1328,9 +1579,11 @@ local Library = { } do
     end
 
     local function AxisFraction(Input, Object, Axis)
-        local Base = Object.AbsolutePosition[Axis]
-        local Span = Object.AbsoluteSize[Axis]
+        local Corner, Size = SafeRect(Object)
+        if not Corner or not Size then return 0 end
 
+        local Base = Corner[Axis]
+        local Span = Size[Axis]
         if Span == 0 then return 0 end
 
         return math.clamp((Input.Position[Axis] - Base) / Span, 0, 1)
@@ -1377,8 +1630,10 @@ local Library = { } do
         return function(Extra)
             local Anchor = GetAnchor()
             local Scale = Library:GetScreenScale()
-            local X = Anchor.AbsolutePosition.X / Scale
-            local Y = Anchor.AbsolutePosition.Y + Anchor.AbsoluteSize.Y + GuiInset
+            local AnchorPos, AnchorSize = SafeRect(Anchor)
+            if not AnchorPos or not AnchorSize then return UDim2.fromOffset(0, 0) end
+            local X = AnchorPos.X / Scale
+            local Y = AnchorPos.Y + AnchorSize.Y + GuiInset
 
             return UDim2.fromOffset(X, Y / Scale + (Extra or 0))
         end
@@ -1388,9 +1643,11 @@ local Library = { } do
         return function(Extra)
             local Anchor = GetAnchor()
             local Scale = Library:GetScreenScale()
-            local Right = Anchor.AbsolutePosition.X + Anchor.AbsoluteSize.X
+            local AnchorPos, AnchorSize = SafeRect(Anchor)
+            if not AnchorPos or not AnchorSize then return UDim2.fromOffset(0, 0) end
+            local Right = AnchorPos.X + AnchorSize.X
             local X = Right / Scale + 8
-            local Y = (Anchor.AbsolutePosition.Y + GuiInset) / Scale
+            local Y = (AnchorPos.Y + GuiInset) / Scale
 
             return UDim2.fromOffset(X, Y + (Extra or 0))
         end
@@ -1737,7 +1994,8 @@ local Library = { } do
                 local Anchor = GetAnchor()
                 local Scale = Library:GetScreenScale()
                 local ShowSearch = #Popup.Order > 8
-                local Width = WidthOverride or (Anchor.AbsoluteSize.X / Scale)
+                local _, AnchorSize = SafeRect(Anchor)
+                local Width = WidthOverride or ((AnchorSize and AnchorSize.X or 0) / Scale)
                 local ListHeight = math.min(#Popup.Order * RowHeight + 8, 168)
 
                 Items.Search.Instance.Text = ""
@@ -2717,7 +2975,9 @@ Items.ProfileCard = MakeFrame({
 
         local function ApplyScale(Input)
             local Base = ScaleTrack.Instance
-            local Span = (Input.Position.X - Base.AbsolutePosition.X) / Base.AbsoluteSize.X
+            local BasePos, BaseSize = SafeRect(Base)
+            if not BasePos or not BaseSize or BaseSize.X == 0 then return end
+            local Span = (Input.Position.X - BasePos.X) / BaseSize.X
 
             ScalePercent = Library:Round(50 + math.clamp(Span, 0, 1) * 100, 5)
 
@@ -2854,9 +3114,11 @@ Items.ProfileCard = MakeFrame({
         local function KeyPlace(Off)
             local Anchor = KeyIcon.Instance
             local PScale = Library:GetScreenScale()
-            local Right = Anchor.AbsolutePosition.X + Anchor.AbsoluteSize.X
+            local AnchorPos, AnchorSize = SafeRect(Anchor)
+            if not AnchorPos or not AnchorSize then return UDim2.fromOffset(0, 0) end
+            local Right = AnchorPos.X + AnchorSize.X
             local PX = Right / PScale + 8 + (Off or 0)
-            local PY = (Anchor.AbsolutePosition.Y + GuiInset) / PScale - 4
+            local PY = (AnchorPos.Y + GuiInset) / PScale - 4
 
             return UDim2.fromOffset(PX, PY)
         end
@@ -2949,8 +3211,10 @@ Items.ProfileCard = MakeFrame({
         local function ProfilePlace(Extra)
             local Card  = Items.ProfileCard.Instance
             local Scale = Library:GetScreenScale()
-            local X = Card.AbsolutePosition.X / Scale
-            local Y = (Card.AbsolutePosition.Y + GuiInset - 272 - 10) / Scale
+            local CardPos = select(1, SafeRect(Card))
+            if not CardPos then return UDim2.fromOffset(0, 0) end
+            local X = CardPos.X / Scale
+            local Y = (CardPos.Y + GuiInset - 272 - 10) / Scale
             return UDim2.fromOffset(X, Y + (Extra or 0))
         end
 
@@ -2992,6 +3256,43 @@ Items.ProfileCard = MakeFrame({
             Z = 2
         })
 
+
+        if IsMobile and Params.MobileButton ~= false then
+            local MobileHost = MakeFrame({
+                Parent = Library.Holder.Instance,
+                Pos = UDim2.new(0, 14, 0.5, -22),
+                Size = UDim2.fromOffset(44, 44),
+                Color = "Section",
+                Round = 12,
+                Z = 90
+            })
+
+            Library:RegisterExternalInstance(MobileHost.Instance)
+
+            local MobileIcon = MakeImage({
+                Parent = MobileHost.Instance,
+                Icon = Params.Icon or "layers",
+                Anchor = Vector2.new(0.5, 0.5),
+                Pos = UDim2.fromScale(0.5, 0.5),
+                Size = UDim2.fromOffset(21, 21),
+                Color = "Accent",
+                Z = 91
+            })
+
+            local MobileHit = MakeButton({
+                Parent = MobileHost.Instance,
+                Z = 92
+            })
+
+            MobileHit:Connect("MouseButton1Down", function()
+                Window:SetOpen(not Window.IsOpen)
+            end)
+
+            MobileHost:MakeDraggable(MobileHost.Instance)
+            Items.MobileButton = MobileHost
+            Items.MobileButtonIcon = MobileIcon
+        end
+
         Window.Items = Items
 
         Items.Root:MakeDraggable(Items.Main.Instance)
@@ -3005,7 +3306,7 @@ Items.ProfileCard = MakeFrame({
 
             Items.Root.Instance.Position = UDim2.fromOffset(
                 Vp.X / (2 * CScale) - RootW / 2,
-                Vp.Y / (2 * CScale) - RootH / 2
+                (Vp.Y - GuiInset) / (2 * CScale) - RootH / 2
             )
         end
 
@@ -3024,7 +3325,9 @@ Items.ProfileCard = MakeFrame({
             if #Tab.Subs == 0 then return end
 
             local ContentScale = Library:GetScreenScale()
-            local Content = Tab.SubLayout.AbsoluteContentSize.X / ContentScale + 16
+            local AbsoluteContent = SafeAbsoluteContentSize(Tab.SubLayout)
+            if not AbsoluteContent then return end
+            local Content = AbsoluteContent.X / ContentScale + 16
 
             if Content <= 16 then return end
 
@@ -3421,12 +3724,8 @@ Items.ProfileCard = MakeFrame({
         SetRest(Items.Label.Instance, "TextTransparency", 1)
 
         local function SyncWidth()
-            local Ok, Measured = pcall(function()
-                return MeasureText(SubTab.Name, 15, 240, UiFont)
-            end)
-
-            local Bounds = (Ok and Measured and math.ceil(Measured.X)) or math.ceil(#tostring(SubTab.Name) * 7.5)
-            if Bounds <= 0 then return end
+            local Measured = MeasureText(SubTab.Name, 15, 300, UiFont)
+            local Bounds = math.max(1, math.ceil(Measured.X))
 
             ExpandedW = 37 + Bounds + 12
             SubTab.ExpandedW = ExpandedW
@@ -3829,12 +4128,8 @@ Items.ProfileCard = MakeFrame({
         })
 
         local function SyncHeader()
-            local Ok, Measured = pcall(function()
-                return MeasureText(Section.Name, 15, 240, UiFont)
-            end)
-
-            local Bounds = (Ok and Measured and math.ceil(Measured.X)) or math.ceil(#tostring(Section.Name) * 7.5)
-            if Bounds <= 0 then return end
+            local Measured = MeasureText(Section.Name, 15, 240, UiFont)
+            local Bounds = math.max(1, math.ceil(Measured.X))
 
             HeaderTextW = Bounds
             HeaderW = Bounds + 26
@@ -4134,9 +4429,11 @@ Items.ProfileCard = MakeFrame({
         local function SidePlace(Anchor)
             return function(Off)
                 local PScale = Library:GetScreenScale()
-                local Right = Anchor.AbsolutePosition.X + Anchor.AbsoluteSize.X
+                local AnchorPos, AnchorSize = SafeRect(Anchor)
+                if not AnchorPos or not AnchorSize then return UDim2.fromOffset(0, 0) end
+                local Right = AnchorPos.X + AnchorSize.X
                 local PX = Right / PScale + 8 + (Off or 0)
-                local PY = (Anchor.AbsolutePosition.Y + GuiInset) / PScale - 4
+                local PY = (AnchorPos.Y + GuiInset) / PScale - 4
 
                 return UDim2.fromOffset(PX, PY)
             end
@@ -5338,9 +5635,11 @@ Items.ProfileCard = MakeFrame({
             Place = function(Off)
                 local Anchor = Items.Icon.Instance
                 local PScale = Library:GetScreenScale()
-                local Right = Anchor.AbsolutePosition.X + Anchor.AbsoluteSize.X
+                local AnchorPos, AnchorSize = SafeRect(Anchor)
+                if not AnchorPos or not AnchorSize then return UDim2.fromOffset(0, 0) end
+                local Right = AnchorPos.X + AnchorSize.X
                 local PX = Right / PScale + 8 + (Off or 0)
-                local PY = (Anchor.AbsolutePosition.Y + GuiInset) / PScale - 4
+                local PY = (AnchorPos.Y + GuiInset) / PScale - 4
 
                 return UDim2.fromOffset(PX, PY)
             end,
@@ -6468,6 +6767,8 @@ Items.ProfileCard = MakeFrame({
     end
 
     Library:Connect(RunService.Heartbeat, function(Delta)
+        if Library.Destroyed then return end
+
         if Library.ThemeDirty then
             Library.ThemeDirty = false
             Library:ApplyThemeInstant()
