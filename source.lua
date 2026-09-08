@@ -2,7 +2,7 @@ if getgenv().diarian and getgenv().diarian.Unload then
     getgenv().diarian:Unload()
 end
 
--- Define before the library initializes any Roblox instances.
+
 local function SafeCreate(Class)
     local ok, inst = pcall(Instance.new, Class)
     if ok and inst then
@@ -295,7 +295,7 @@ end
     end
 
     Library.__index = Library
-    Library.Version = "1.4.1-safe-init"
+    Library.Version = "1.5-safecreate-clean"
     Library.IsMobile = IsMobile
     Library.DevicePlatform = DevicePlatform
     Library.WindowWidth = IsMobile and 640 or 716
@@ -303,7 +303,7 @@ end
     Library.MinMobileScale = 0.58
     Library.MaxMobileScale = 1
 
-    -- Brand identity
+
     Library.BrandAccent = Color3.fromRGB(29, 100, 235)
     Library.BrandIcon = "layers"
 
@@ -1383,7 +1383,7 @@ end
 
     local function MakeShadow(Parent, Color, Spread, Blur, Transparency)
         local Ok, Shadow = pcall(function()
-            local S = Instance.new("UIShadow")
+            local S = SafeCreate("UIShadow")
             S.Name = "\0"
             S.Color = Color
             S.Spread = Spread
@@ -2723,7 +2723,7 @@ end
             Items = { }
         }
 
-        -- A identidade visual da library usa sempre o azul da flor/logo.
+
         Library.BrandIcon = Window.Icon
         Library:SetAccent(Library.BrandAccent)
 
@@ -2832,7 +2832,7 @@ end
             Z = 4
         })
 
-        -- ── MakeAvatar helper ──────────────────────────────────────
+
         local function MakeAvatar(Parent, Props)
             local Avatar = Library:Create("ImageLabel", {
                 Parent = Parent,
@@ -2852,7 +2852,7 @@ end
             return Avatar
         end
 
-        -- ── Profile card · bottom-left of Root ───────────────────────
+
 local ProfCardW  = 60
 local ProfCardY  = RailY + RailH + 10
 
@@ -6871,5 +6871,5 @@ Items.ProfileCard = MakeFrame({
 
     getgenv().diarian = Library
 end
-    
+
 return Library
