@@ -383,18 +383,11 @@ local Library = { } do
 
             for _, Child in Descendants do
                 local Valid, IsImage, Image = pcall(function()
-                    return
-                        Child:IsA("ImageLabel") or Child:IsA("ImageButton"),
-                        Child.Image
+                    return Child:IsA("ImageLabel") or Child:IsA("ImageButton"), Child.Image
                 end)
 
-                if not Valid or not IsImage or Image == "" then
-                    continue
-                end
-
-                if Library.Preloaded[Child] then
-                    continue
-                end
+                if not Valid or not IsImage or Image == "" then continue end
+                if Library.Preloaded[Child] then continue end
 
                 Library.Preloaded[Child] = true
                 table.insert(Assets, Child)
@@ -790,9 +783,17 @@ local Library = { } do
     end
 
     local function IsOverObject(Object)
+        if not Object then return false end
+
+        local Ok, Corner, Size = pcall(function()
+            return Object.AbsolutePosition, Object.AbsoluteSize
+        end)
+
+        if not Ok or not Corner or not Size then
+            return false
+        end
+
         local Position = UserInputService:GetMouseLocation() - Vector2.new(0, GuiInset)
-        local Corner = Object.AbsolutePosition
-        local Size = Object.AbsoluteSize
 
         return Position.X >= Corner.X
         and Position.X <= Corner.X + Size.X
@@ -880,31 +881,8 @@ local Library = { } do
         end)
     end
 
-    Library.ExternalConnections = Library.ExternalConnections or { }
-    Library.ExternalInstances = Library.ExternalInstances or { }
-
-    Library.RegisterExternalConnection = function(Self, Connection)
-        if Connection then
-            table.insert(Library.ExternalConnections, Connection)
-        end
-        return Connection
-    end
-
-    Library.RegisterExternalInstance = function(Self, Object)
-        if Object then
-            table.insert(Library.ExternalInstances, Object)
-        end
-        return Object
-    end
-
     Library.Unload = function(Self)
         for _, Connection in Library.Connections do
-            pcall(function()
-                Connection:Disconnect()
-            end)
-        end
-
-        for _, Connection in Library.ExternalConnections do
             pcall(function()
                 Connection:Disconnect()
             end)
@@ -914,24 +892,9 @@ local Library = { } do
             pcall(coroutine.close, Thread)
         end
 
-        for _, Object in Library.ExternalInstances do
-            pcall(function()
-                Object:Destroy()
-            end)
-        end
-
         for _, Root in { Library.Holder, Library.PopupHolder, Library.UnusedHolder } do
-            if Root and Root.Instance then
-                pcall(function()
-                    Root.Instance:Destroy()
-                end)
-            end
+            if Root then Root.Instance:Destroy() end
         end
-
-        table.clear(Library.Connections)
-        table.clear(Library.ExternalConnections)
-        table.clear(Library.ExternalInstances)
-        table.clear(Library.Threads)
 
         getgenv().diarian = nil
     end
@@ -972,8 +935,13 @@ local Library = { } do
         })
 
         task.defer(function()
-            GuiInset = -Probe.Instance.AbsolutePosition.Y
-            Probe.Instance:Destroy()
+            pcall(function()
+                GuiInset = -Probe.Instance.AbsolutePosition.Y
+            end)
+
+            pcall(function()
+                Probe.Instance:Destroy()
+            end)
         end)
     end
 
@@ -1297,8 +1265,15 @@ local Library = { } do
     end)
 
     local function PointInside(Position, Object)
-        local Corner = Object.AbsolutePosition
-        local Size = Object.AbsoluteSize
+        if not Object then return false end
+
+        local Ok, Corner, Size = pcall(function()
+            return Object.AbsolutePosition, Object.AbsoluteSize
+        end)
+
+        if not Ok or not Corner or not Size then
+            return false
+        end
 
         return Position.X >= Corner.X
         and Position.X <= Corner.X + Size.X
@@ -3446,20 +3421,28 @@ Items.ProfileCard = MakeFrame({
         SetRest(Items.Label.Instance, "TextTransparency", 1)
 
         local function SyncWidth()
-            local Bounds = math.ceil(Items.Label.Instance.TextBounds.X)
+            local Ok, Measured = pcall(function()
+                return MeasureText(SubTab.Name, 15, 240, UiFont)
+            end)
+
+            local Bounds = (Ok and Measured and math.ceil(Measured.X)) or math.ceil(#tostring(SubTab.Name) * 7.5)
             if Bounds <= 0 then return end
 
             ExpandedW = 37 + Bounds + 12
             SubTab.ExpandedW = ExpandedW
-            Items.Label.Instance.Size = UDim2.fromOffset(Bounds + 8, 20)
+
+            pcall(function()
+                Items.Label.Instance.Size = UDim2.fromOffset(Bounds + 8, 20)
+            end)
 
             if Tab.Current == SubTab then
-                Items.Pill.Instance.Size = UDim2.fromOffset(ExpandedW, 30)
+                pcall(function()
+                    Items.Pill.Instance.Size = UDim2.fromOffset(ExpandedW, 30)
+                end)
                 Window:FitSubBar(true)
             end
         end
 
-        Library:Connect(Items.Label.Instance:GetPropertyChangedSignal("TextBounds"), SyncWidth)
         task.defer(SyncWidth)
 
         Items.Hit = MakeButton({
@@ -3846,18 +3829,23 @@ Items.ProfileCard = MakeFrame({
         })
 
         local function SyncHeader()
-            local Bounds = math.ceil(Items.Label.Instance.TextBounds.X)
+            local Ok, Measured = pcall(function()
+                return MeasureText(Section.Name, 15, 240, UiFont)
+            end)
+
+            local Bounds = (Ok and Measured and math.ceil(Measured.X)) or math.ceil(#tostring(Section.Name) * 7.5)
             if Bounds <= 0 then return end
 
             HeaderTextW = Bounds
             HeaderW = Bounds + 26
 
-            Items.Label.Instance.Size = UDim2.fromOffset(Bounds + 6, 20)
-            Items.Header.Instance.Size = UDim2.fromOffset(HeaderW, 25)
-            Items.HeaderFill.Instance.Size = UDim2.fromOffset(HeaderW, 10)
+            pcall(function()
+                Items.Label.Instance.Size = UDim2.fromOffset(Bounds + 6, 20)
+                Items.Header.Instance.Size = UDim2.fromOffset(HeaderW, 25)
+                Items.HeaderFill.Instance.Size = UDim2.fromOffset(HeaderW, 10)
+            end)
         end
 
-        Library:Connect(Items.Label.Instance:GetPropertyChangedSignal("TextBounds"), SyncHeader)
         task.defer(SyncHeader)
 
         Items.Frame = MakeFrame({
