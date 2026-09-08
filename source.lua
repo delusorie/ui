@@ -295,7 +295,7 @@ end
     end
 
     Library.__index = Library
-    Library.Version = "1.5.3-subtab-visible"
+    Library.Version = "1.5.5-capability-clean"
     Library.IsMobile = IsMobile
     Library.DevicePlatform = DevicePlatform
     Library.WindowWidth = IsMobile and 640 or 716
@@ -668,6 +668,32 @@ end
         return Success, Result
     end
 
+    local function SafeGetProperty(Object, Property, Default)
+        if not Object then
+            return Default
+        end
+
+        local Ok, Value = pcall(function()
+            return Object[Property]
+        end)
+
+        if Ok then
+            return Value
+        end
+
+        return Default
+    end
+
+    local function SafeSetProperty(Object, Property, Value)
+        if not Object then
+            return false
+        end
+
+        return pcall(function()
+            Object[Property] = Value
+        end)
+    end
+
     Library.Round = function(Self, Number, Float)
         Float = Float or 1
 
@@ -679,6 +705,7 @@ end
 
     Library.Tween = function(Self, Properties, Info, RawItem)
         local Object = RawItem or Self.Instance
+        if not Object then return nil end
 
         Info = Info or TweenInfo.new(
             Library.Animation.Time,
@@ -686,8 +713,20 @@ end
             Library.Animation.Direction
         )
 
-        local NewTween = TweenService:Create(Object, Info, Properties)
-        NewTween:Play()
+        local Ok, NewTween = pcall(function()
+            return TweenService:Create(Object, Info, Properties)
+        end)
+
+        if not Ok or not NewTween then
+            for Property, Value in Properties do
+                SafeSetProperty(Object, Property, Value)
+            end
+            return nil
+        end
+
+        pcall(function()
+            NewTween:Play()
+        end)
 
         return NewTween
     end
@@ -902,9 +941,12 @@ end
 
         for Property, Value in Properties do
             if type(Value) == "string" then
-                Object[Property] = Library.Theme[Value]
+                SafeSetProperty(Object, Property, Library.Theme[Value])
             else
-                Object[Property] = Value()
+                local Ok, Result = pcall(Value)
+                if Ok then
+                    SafeSetProperty(Object, Property, Result)
+                end
             end
         end
 
@@ -936,21 +978,22 @@ end
         for _, Item in Library.ThemingStuff do
             for Property, Value in Item.Properties do
                 if type(Value) == "string" then
-                    Item.Item[Property] = Library.Theme[Value]
+                    SafeSetProperty(Item.Item, Property, Library.Theme[Value])
                 elseif type(Value) == "function" then
-                    Item.Item[Property] = Value()
+                    local Ok, Result = pcall(Value)
+                    if Ok then
+                        SafeSetProperty(Item.Item, Property, Result)
+                    end
                 end
             end
         end
 
         for _, Gradient in Library.AccentGradients do
-            Gradient.Color = AccentSequence()
+            SafeSetProperty(Gradient, "Color", AccentSequence())
         end
 
         for _, Shadow in Library.AccentShadows do
-            pcall(function()
-                Shadow.Color = Library.Theme.Accent
-            end)
+            SafeSetProperty(Shadow, "Color", Library.Theme.Accent)
         end
     end
 
@@ -1055,7 +1098,8 @@ end
         local InputChanged
 
         local function GetParentAndGuiSize()
-            local _, ParentSize = SafeRect(Gui.Parent)
+            local Parent = SafeGetProperty(Gui, "Parent")
+            local _, ParentSize = SafeRect(Parent)
             local _, GuiSize = SafeRect(Gui)
 
             if not ParentSize or not GuiSize then
@@ -1466,8 +1510,8 @@ end
             Library:StampResting(Dim.Instance, "BackgroundTransparency", Target)
 
             if Shown then
-                Dim.Instance.Parent = Hosts[Index]
-                Dim.Instance.Visible = true
+                SafeSetProperty(Dim.Instance, "Parent", Hosts[Index])
+                SafeSetProperty(Dim.Instance, "Visible", true)
             end
 
             Library:Tween({ BackgroundTransparency = Target }, Info, Dim.Instance)
@@ -1479,8 +1523,8 @@ end
             if Library.DimCount > 0 then return end
 
             for _, Dim in Library.Dims do
-                Dim.Instance.Visible = false
-                Dim.Instance.Parent = Library.UnusedHolder.Instance
+                SafeSetProperty(Dim.Instance, "Visible", false)
+                SafeSetProperty(Dim.Instance, "Parent", Library.UnusedHolder.Instance)
             end
         end)
     end
@@ -3465,7 +3509,7 @@ Items.ProfileCard = MakeFrame({
                 Items.Root:ResetFade()
             end)
 
-            Items.Root.Instance.Visible = Bool
+            SafeSetProperty(Items.Root.Instance, "Visible", Bool)
         end
 
         Library:Connect(UserInputService.InputBegan, function(Input, Processed)
@@ -4324,6 +4368,14 @@ Items.ProfileCard = MakeFrame({
         table.insert(SubTab.Sections, Section)
         table.insert(Column.Sections, Section)
         Section:Reflow()
+
+        if SubTab.Active then
+            task.defer(function()
+                if SubTab.Active then
+                    SubTab:SnapVisible()
+                end
+            end)
+        end
 
         return setmetatable(Section, Library)
     end
