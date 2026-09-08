@@ -52,9 +52,56 @@ local Library = { } do
 
     local IsMobile = ComputeMobileMode()
 
-    local GetHui = gethui or function()
-        return cloneref(game:GetService("CoreGui"))
+    local PlayersService = cloneref(game:GetService("Players"))
+local CoreGuiService = cloneref(game:GetService("CoreGui"))
+
+local function GetPlayerGui()
+    local Player = PlayersService.LocalPlayer or PlayersService.PlayerAdded:Wait()
+    return Player:WaitForChild("PlayerGui")
+end
+
+local function GetHui()
+    if type(gethui) == "function" then
+        local Ok, Result = pcall(gethui)
+        if Ok and Result then
+            return Result
+        end
     end
+
+    local OkPlayerGui, PlayerGui = pcall(GetPlayerGui)
+    if OkPlayerGui and PlayerGui then
+        return PlayerGui
+    end
+
+    return CoreGuiService
+end
+
+local function SafeCreate(Class)
+    local Ok, InstanceObject = pcall(Instance.new, Class)
+    if Ok and InstanceObject then
+        return InstanceObject
+    end
+
+    if syn and type(syn.create) == "function" then
+        local SynOk, SynObject = pcall(syn.create, Class)
+        if SynOk and SynObject then
+            return SynObject
+        end
+    end
+
+    error(("Unable to create Roblox Instance %q in this executor"):format(tostring(Class)))
+end
+
+local LibraryPreferredParent
+
+local function ResolveUiParent()
+    if LibraryPreferredParent then
+        return LibraryPreferredParent
+    end
+
+    return GetHui()
+end
+
 
     Library.Directory = "diarian"
     Library.ConfigFolder = "diarian/Configs"
@@ -226,7 +273,7 @@ local Library = { } do
     end
 
     Library.__index = Library
-    Library.Version = "1.3-brand-responsive"
+    Library.Version = "1.4-safe-parent"
     Library.IsMobile = IsMobile
     Library.DevicePlatform = DevicePlatform
     Library.WindowWidth = IsMobile and 640 or 716
@@ -379,7 +426,7 @@ local Library = { } do
     Library.Create = function(Self, Class, Properties)
         local Data = {
             Class = Class,
-            Instance = Instance.new(Class)
+            Instance = SafeCreate(Class)
         }
 
         local ParentValue
@@ -455,6 +502,11 @@ local Library = { } do
         end)
 
         return Ok and Result or false
+    end
+
+    Library.SetUIParent = function(Self, Parent)
+        LibraryPreferredParent = Parent
+        return Parent
     end
 
     Library.RegisterExternalConnection = function(Self, Connection)
@@ -1108,7 +1160,7 @@ local Library = { } do
     end
 
     Library.Holder = Library:Create("ScreenGui", {
-        Parent = GetHui(),
+        Parent = ResolveUiParent(),
         Name = "\0",
         ZIndexBehavior = Enum.ZIndexBehavior.Global,
         ResetOnSpawn = false,
@@ -1117,7 +1169,7 @@ local Library = { } do
     })
 
     Library.PopupHolder = Library:Create("ScreenGui", {
-        Parent = GetHui(),
+        Parent = ResolveUiParent(),
         Name = "\0",
         ZIndexBehavior = Enum.ZIndexBehavior.Global,
         ResetOnSpawn = false,
@@ -1126,7 +1178,7 @@ local Library = { } do
     })
 
     Library.UnusedHolder = Library:Create("ScreenGui", {
-        Parent = GetHui(),
+        Parent = ResolveUiParent(),
         Name = "\0",
         Enabled = false,
         ResetOnSpawn = false
