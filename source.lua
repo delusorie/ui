@@ -2,6 +2,44 @@ if getgenv().diarian and getgenv().diarian.Unload then
     getgenv().diarian:Unload()
 end
 
+-- Define before the library initializes any Roblox instances.
+local function SafeCreate(Class)
+    local ok, inst = pcall(Instance.new, Class)
+    if ok and inst then
+        return inst
+    end
+
+    if syn and syn.create then
+        local synOk, synInst = pcall(syn.create, Class)
+        if synOk and synInst then
+            return synInst
+        end
+    end
+
+    local result
+    local finished = false
+
+    task.defer(function()
+        local deferOk, deferInst = pcall(Instance.new, Class)
+        if deferOk then
+            result = deferInst
+        end
+        finished = true
+    end)
+
+    local t = 0
+    repeat
+        task.wait()
+        t += 1
+    until result or finished or t > 200
+
+    if result then
+        return result
+    end
+
+    error(("Unable to create Roblox Instance %q in this executor"):format(tostring(Class)))
+end
+
 local Library = { } do
     local cloneref = cloneref or function(Object)
         return Object
@@ -74,22 +112,6 @@ local function GetHui()
     end
 
     return CoreGuiService
-end
-
-local function SafeCreate(Class)
-    local Ok, InstanceObject = pcall(Instance.new, Class)
-    if Ok and InstanceObject then
-        return InstanceObject
-    end
-
-    if syn and type(syn.create) == "function" then
-        local SynOk, SynObject = pcall(syn.create, Class)
-        if SynOk and SynObject then
-            return SynObject
-        end
-    end
-
-    error(("Unable to create Roblox Instance %q in this executor"):format(tostring(Class)))
 end
 
 local LibraryPreferredParent
@@ -273,7 +295,7 @@ end
     end
 
     Library.__index = Library
-    Library.Version = "1.4-safe-parent"
+    Library.Version = "1.4.1-safe-init"
     Library.IsMobile = IsMobile
     Library.DevicePlatform = DevicePlatform
     Library.WindowWidth = IsMobile and 640 or 716
