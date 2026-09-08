@@ -3,8 +3,10 @@ if getgenv().diarian and getgenv().diarian.Unload then
 end
 
 
+local _OriginalInstanceNew = Instance.new
+
 local function SafeCreate(Class)
-    local ok, inst = pcall(Instance.new, Class)
+    local ok, inst = pcall(_OriginalInstanceNew, Class)
     if ok and inst then
         return inst
     end
@@ -14,27 +16,6 @@ local function SafeCreate(Class)
         if synOk and synInst then
             return synInst
         end
-    end
-
-    local result
-    local finished = false
-
-    task.defer(function()
-        local deferOk, deferInst = pcall(Instance.new, Class)
-        if deferOk then
-            result = deferInst
-        end
-        finished = true
-    end)
-
-    local t = 0
-    repeat
-        task.wait()
-        t += 1
-    until result or finished or t > 200
-
-    if result then
-        return result
     end
 
     error(("Unable to create Roblox Instance %q in this executor"):format(tostring(Class)))
@@ -295,7 +276,7 @@ end
     end
 
     Library.__index = Library
-    Library.Version = "1.5-safecreate-clean"
+    Library.Version = "1.6-capability-safe"
     Library.IsMobile = IsMobile
     Library.DevicePlatform = DevicePlatform
     Library.WindowWidth = IsMobile and 640 or 716
@@ -488,6 +469,52 @@ end
         end
 
         return setmetatable(Data, Library)
+    end
+
+    local function SafeWrappedInstance(Value)
+        if Value == nil then
+            return nil
+        end
+
+        if type(Value) == "table" then
+            local Ok, Wrapped = pcall(rawget, Value, "Instance")
+            if Ok and Wrapped then
+                return Wrapped
+            end
+        end
+
+        local OkType, RobloxType = pcall(typeof, Value)
+        if OkType and RobloxType == "Instance" then
+            return Value
+        end
+
+        return nil
+    end
+
+    local function SafeGetProperty(Object, Property, Default)
+        if not Object then
+            return Default
+        end
+
+        local Ok, Value = pcall(function()
+            return Object[Property]
+        end)
+
+        if Ok then
+            return Value
+        end
+
+        return Default
+    end
+
+    local function SafeSetProperty(Object, Property, Value)
+        if not Object then
+            return false
+        end
+
+        return pcall(function()
+            Object[Property] = Value
+        end)
     end
 
     local function SafeRect(Object)
@@ -994,8 +1021,11 @@ end
     end
 
     Library.GetScreenScale = function(Self)
-        if Library.UIScale and Library.UIScale.Instance then
-            return Library.UIScale.Instance.Scale
+        local ScaleObject = SafeWrappedInstance(Library.UIScale)
+        local Scale = SafeGetProperty(ScaleObject, "Scale", 1)
+
+        if type(Scale) == "number" then
+            return Scale
         end
 
         return 1
@@ -1502,7 +1532,7 @@ end
 
         local Old = 1
         pcall(function()
-            Old = Library.UIScale.Instance.Scale
+            Old = SafeGetProperty(SafeWrappedInstance(Library.UIScale), "Scale", 1)
         end)
 
         local Centers = { }
@@ -1524,8 +1554,8 @@ end
         end
 
         pcall(function()
-            Library.UIScale.Instance.Scale = Scale
-            Library.PopupScale.Instance.Scale = Scale
+            SafeSetProperty(SafeWrappedInstance(Library.UIScale), "Scale", Scale)
+            SafeSetProperty(SafeWrappedInstance(Library.PopupScale), "Scale", Scale)
         end)
 
         if IsMobile then
