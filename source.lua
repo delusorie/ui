@@ -226,13 +226,17 @@ local Library = { } do
     end
 
     Library.__index = Library
-    Library.Version = "1.2-responsive"
+    Library.Version = "1.3-brand-responsive"
     Library.IsMobile = IsMobile
     Library.DevicePlatform = DevicePlatform
     Library.WindowWidth = IsMobile and 640 or 716
     Library.WindowHeight = IsMobile and 470 or 540
     Library.MinMobileScale = 0.58
     Library.MaxMobileScale = 1
+
+    -- Brand identity
+    Library.BrandAccent = Color3.fromRGB(29, 100, 235)
+    Library.BrandIcon = "layers"
 
     Library.Theme = {
         Background = Color3.fromRGB(16, 20, 30),
@@ -244,7 +248,7 @@ local Library = { } do
         Text       = Color3.fromRGB(230, 238, 255),
         DimText    = Color3.fromRGB(108, 122, 148),
         DimIcon    = Color3.fromRGB(108, 122, 148),
-        Accent     = Color3.fromRGB(80, 140, 255)
+        Accent     = Library.BrandAccent
     }
 
     Library.AccentPresets = {
@@ -280,7 +284,7 @@ local Library = { } do
             Text       = Color3.fromRGB(230, 238, 255),
             DimText    = Color3.fromRGB(108, 122, 148),
             DimIcon    = Color3.fromRGB(108, 122, 148),
-            Accent     = Color3.fromRGB(80, 140, 255)
+            Accent     = Library.BrandAccent
         }),
         MakePreset("Emerald", {
             Background = Color3.fromRGB(14, 24, 20),
@@ -872,7 +876,8 @@ local Library = { } do
     end
 
     Library.SetAccent = function(Self, Color)
-        Library.Theme.Accent = Color
+
+        Color = Library.BrandAccent        Library.Theme.Accent = Color
         DeriveTheme()
         Library.ThemeDirty = true
     end
@@ -2633,7 +2638,7 @@ local Library = { } do
 
         local Window = {
             Name = Params.Name or "diarian",
-            Icon = Params.Icon or "layers",
+            Icon = Params.Icon or Library.BrandIcon or "layers",
             IsOpen = true,
             Tabs = { },
             Current = nil,
@@ -2644,9 +2649,9 @@ local Library = { } do
             Items = { }
         }
 
-        if Params.Accent then
-            Library:SetAccent(Params.Accent)
-        end
+        -- A identidade visual da library usa sempre o azul da flor/logo.
+        Library.BrandIcon = Window.Icon
+        Library:SetAccent(Library.BrandAccent)
 
         local Items = { }
         local Viewport = workspace.CurrentCamera.ViewportSize
@@ -3271,7 +3276,7 @@ Items.ProfileCard = MakeFrame({
 
             local MobileIcon = MakeImage({
                 Parent = MobileHost.Instance,
-                Icon = Params.Icon or "layers",
+                Icon = Params.Icon or Library.BrandIcon or "layers",
                 Anchor = Vector2.new(0.5, 0.5),
                 Pos = UDim2.fromScale(0.5, 0.5),
                 Size = UDim2.fromOffset(21, 21),
@@ -6536,7 +6541,7 @@ Items.ProfileCard = MakeFrame({
             return Library.WatermarkBar
         end
 
-        local Icon = Params.Icon or (Self and Self.Icon) or "layers"
+        local Icon = Library.BrandIcon or Params.Icon or (Self and Self.Icon) or "layers"
         local Items = { }
         local Order = 0
 
@@ -6575,7 +6580,7 @@ Items.ProfileCard = MakeFrame({
             Parent = Items.Bar.Instance,
             Icon = Icon,
             Size = UDim2.fromOffset(20, 20),
-            Raw = Color3.new(1, 1, 1),
+            Color = "Accent",
             Fit = true,
             Z = 61
         })
@@ -6657,7 +6662,12 @@ Items.ProfileCard = MakeFrame({
         local Watermark = { Instance = Items.Bar.Instance }
 
         function Watermark:SetIcon(NewIcon)
+            Library.BrandIcon = NewIcon
             ApplyIcon(Items.Icon.Instance, NewIcon)
+
+            pcall(function()
+                Items.Icon.Instance.ImageColor3 = Library.Theme.Accent
+            end)
         end
 
         function Watermark:SetName()
