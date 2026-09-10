@@ -431,14 +431,14 @@ end
     Library.TouchButtons = { }
     Library.TouchShields = { }
     Library.Searchables = { }
-    Library.MenuKeybind = Enum.KeyCode.G
+    Library.MenuKeybind = Enum.KeyCode.K
     Library.Binding = false
     Library.UserScale = 1
     Library.Silent = false
     Library.ThemeDirty = false
     Library.PreloadDirty = false
     Library.PreloadClock = 0
-    Library.Preloaded = setmetatable({ }, { __mode = "k" })
+    Library.Preloaded = setmetatable({ }, { __mode = "K" })
     Library.Animation = {
         Time = 0.25,
         Style = Enum.EasingStyle.Quart,
