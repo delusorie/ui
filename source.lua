@@ -4926,6 +4926,146 @@ Items.ProfileCard = MakeFrame({
             Keybind:SetMode(Keybind.Mode, true)
             Keybind:Set(Keybind.Key)
 
+            local MobileConfig = KParams.MobileButton
+            if MobileConfig == true then
+                MobileConfig = {}
+            end
+
+            if WindowMobile and type(MobileConfig) == "table" and MobileConfig.Enabled ~= false then
+                local MobileSize = MobileConfig.Size or 52
+                local HolderSize = MobileSize + 6
+                local MobileHolder = MakeFrame({
+                    Parent = Library.Holder.Instance,
+                    Pos = MobileConfig.Position or UDim2.new(1, -(HolderSize + 18), 0.62, 0),
+                    Size = UDim2.fromOffset(HolderSize, HolderSize),
+                    Z = 88
+                })
+
+                MobileHolder.Instance.BackgroundTransparency = 1
+                Library:RegisterExternalInstance(MobileHolder.Instance)
+
+                local Glow = Library:Create("Frame", {
+                    Parent = MobileHolder.Instance,
+                    AnchorPoint = Vector2.new(0.5, 0.5),
+                    Position = UDim2.fromScale(0.5, 0.5),
+                    Size = UDim2.fromOffset(MobileSize + 4, MobileSize + 4),
+                    BackgroundTransparency = 1,
+                    BorderSizePixel = 0,
+                    ZIndex = 88
+                })
+
+                Library:Create("UICorner", {
+                    Parent = Glow,
+                    CornerRadius = UDim.new(1, 0)
+                })
+
+                local GlowStroke = Library:Create("UIStroke", {
+                    Parent = Glow,
+                    Color = Color3.fromRGB(27, 81, 186),
+                    Thickness = 3,
+                    Transparency = 0.58
+                })
+
+                local MobileKey = Library:Create("ImageButton", {
+                    Parent = MobileHolder.Instance,
+                    AnchorPoint = Vector2.new(0.5, 0.5),
+                    Position = UDim2.fromScale(0.5, 0.5),
+                    Size = UDim2.fromOffset(MobileSize, MobileSize),
+                    BackgroundColor3 = Color3.fromRGB(15, 24, 39),
+                    BorderSizePixel = 0,
+                    AutoButtonColor = false,
+                    Image = "",
+                    ZIndex = 89
+                })
+
+                Library:Create("UICorner", {
+                    Parent = MobileKey,
+                    CornerRadius = UDim.new(1, 0)
+                })
+
+                local StateStroke = Library:Create("UIStroke", {
+                    Parent = MobileKey,
+                    Color = Color3.fromRGB(215, 70, 70),
+                    Thickness = 2,
+                    Transparency = 0
+                })
+
+                local Icon = Library:Create("ImageLabel", {
+                    Parent = MobileKey,
+                    AnchorPoint = Vector2.new(0.5, 0.5),
+                    Position = UDim2.fromScale(0.5, 0.5),
+                    Size = UDim2.fromOffset(math.floor(MobileSize * 0.6), math.floor(MobileSize * 0.6)),
+                    BackgroundTransparency = 1,
+                    Image = MobileConfig.Icon and (tostring(MobileConfig.Icon):match("^%d+$") and ("rbxthumb://type=Asset&id=" .. tostring(MobileConfig.Icon) .. "&w=150&h=150") or ResolveIcon(MobileConfig.Icon)) or "rbxthumb://type=Asset&id=13050670483&w=150&h=150",
+                    ScaleType = Enum.ScaleType.Fit,
+                    ZIndex = 90
+                })
+
+                local Dragging = false
+                local Moved = false
+                local DragStart
+                local StartPosition
+
+                local function UpdateMobileState(State)
+                    StateStroke.Color = State and Color3.fromRGB(65, 205, 110) or Color3.fromRGB(215, 70, 70)
+                    GlowStroke.Transparency = State and 0.42 or 0.58
+                end
+
+                local OldSetActive = Keybind.SetActive
+                function Keybind:SetActive(Bool)
+                    OldSetActive(self, Bool)
+                    UpdateMobileState(Keybind.Independent and Keybind.Active or Toggle.Value)
+                end
+
+                local OldToggleSet = Toggle.Set
+                function Toggle:Set(Value, ...)
+                    local Result = OldToggleSet(self, Value, ...)
+                    UpdateMobileState(Toggle.Value)
+                    return Result
+                end
+
+                Library:Connect(MobileKey.InputBegan, function(Input)
+                    if Input.UserInputType ~= Enum.UserInputType.MouseButton1 and Input.UserInputType ~= Enum.UserInputType.Touch then return end
+                    Dragging = true
+                    Moved = false
+                    DragStart = Input.Position
+                    StartPosition = MobileHolder.Instance.Position
+                end)
+
+                Library:Connect(UserInputService.InputChanged, function(Input)
+                    if not Dragging then return end
+                    if Input.UserInputType ~= Enum.UserInputType.MouseMovement and Input.UserInputType ~= Enum.UserInputType.Touch then return end
+                    local Delta = Input.Position - DragStart
+                    if Delta.Magnitude > 5 then
+                        Moved = true
+                    end
+                    if Moved then
+                        MobileHolder.Instance.Position = UDim2.new(
+                            StartPosition.X.Scale,
+                            StartPosition.X.Offset + Delta.X,
+                            StartPosition.Y.Scale,
+                            StartPosition.Y.Offset + Delta.Y
+                        )
+                    end
+                end)
+
+                Library:Connect(UserInputService.InputEnded, function(Input)
+                    if not Dragging then return end
+                    if Input.UserInputType ~= Enum.UserInputType.MouseButton1 and Input.UserInputType ~= Enum.UserInputType.Touch then return end
+                    Dragging = false
+                    if Moved then return end
+                    if Keybind.Condition and not Keybind.Condition() then return end
+                    if Keybind.Independent then
+                        Keybind:SetActive(not Keybind.Active)
+                    else
+                        Toggle:Set(not Toggle.Value)
+                    end
+                end)
+
+                UpdateMobileState(Keybind.Independent and Keybind.Active or Toggle.Value)
+                Keybind.MobileButton = MobileHolder.Instance
+            end
+
             return Keybind
         end
 
