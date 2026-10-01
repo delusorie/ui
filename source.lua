@@ -3413,8 +3413,8 @@ Items.ProfileCard = MakeFrame({
         if WindowMobile and Params.MobileButton ~= false then
             local MobileHost = MakeFrame({
                 Parent = Library.Holder.Instance,
-                Pos = UDim2.new(0, 14, 0.5, -22),
-                Size = UDim2.fromOffset(44, 44),
+                Pos = UDim2.fromOffset(10, 4),
+                Size = UDim2.fromOffset(48, 48),
                 Color = "Section",
                 Round = 12,
                 Z = 90
@@ -3427,7 +3427,7 @@ Items.ProfileCard = MakeFrame({
                 Icon = Params.MobileButtonIcon or "rbxassetid://83861117125650",
                 Anchor = Vector2.new(0.5, 0.5),
                 Pos = UDim2.fromScale(0.5, 0.5),
-                Size = UDim2.fromOffset(40, 40),
+                Size = UDim2.fromOffset(44, 44),
                 Color = Color3.fromRGB(255, 255, 255),
                 Fit = true,
                 Z = 91
@@ -6733,7 +6733,7 @@ Items.ProfileCard = MakeFrame({
             return Library.WatermarkBar
         end
 
-        local Icon = Library.BrandIcon or Params.Icon or (Self and Self.Icon) or "layers"
+        local Icon = Params.Icon or "rbxassetid://91770633749640"
         local Items = { }
         local Order = 0
 
@@ -6772,7 +6772,7 @@ Items.ProfileCard = MakeFrame({
             Parent = Items.Bar.Instance,
             Icon = Icon,
             Size = UDim2.fromOffset(20, 20),
-            Color = "Accent",
+            Color = Color3.fromRGB(255, 255, 255),
             Fit = true,
             Z = 61
         })
@@ -6850,7 +6850,7 @@ Items.ProfileCard = MakeFrame({
             ApplyIcon(Items.Icon.Instance, NewIcon)
 
             pcall(function()
-                Items.Icon.Instance.ImageColor3 = Library.Theme.Accent
+                Items.Icon.Instance.ImageColor3 = Color3.fromRGB(255, 255, 255)
             end)
         end
 
