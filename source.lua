@@ -2770,7 +2770,7 @@ end
         local Window = {
             Name = Params.Name or "diarian",
             Icon = Params.Icon or Library.BrandIcon or "layers",
-            -- Visual logo
+            -- Visual logo used in the top bar (Nexonix-style).
             Logo = Params.Logo or Params.logo or "rbxassetid://91770633749640",
             IsOpen = true,
             Tabs = { },
@@ -3408,7 +3408,9 @@ Items.ProfileCard = MakeFrame({
         })
 
 
-        if IsMobile and Params.MobileButton ~= false then
+        local WindowMobile = IsMobile or Params.ForceMobile == true
+
+        if WindowMobile and Params.MobileButton ~= false then
             local MobileHost = MakeFrame({
                 Parent = Library.Holder.Instance,
                 Pos = UDim2.new(0, 14, 0.5, -22),
