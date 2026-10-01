@@ -2771,7 +2771,7 @@ end
             Name = Params.Name or "diarian",
             Icon = Params.Icon or Library.BrandIcon or "layers",
             -- Visual logo used in the top bar (Nexonix-style).
-            Logo = Params.Logo or Params.logo or "rbxassetid://77749228793011",
+            Logo = Params.Logo or Params.logo or "rbxassetid://107851222063839",
             IsOpen = true,
             Tabs = { },
             Current = nil,
@@ -3422,12 +3422,18 @@ Items.ProfileCard = MakeFrame({
 
             local MobileIcon = MakeImage({
                 Parent = MobileHost.Instance,
-                Icon = Params.Icon or Library.BrandIcon or "layers",
+                Icon = Params.MobileButtonIcon or "rbxassetid://83861117125650",
                 Anchor = Vector2.new(0.5, 0.5),
                 Pos = UDim2.fromScale(0.5, 0.5),
-                Size = UDim2.fromOffset(21, 21),
-                Color = "Accent",
+                Size = UDim2.fromOffset(40, 40),
+                Color = Color3.fromRGB(255, 255, 255),
+                Fit = true,
                 Z = 91
+            })
+
+            Library:Create("UICorner", {
+                Parent = MobileIcon.Instance,
+                CornerRadius = UDim.new(0, 9)
             })
 
             local MobileHit = MakeButton({
@@ -6799,21 +6805,13 @@ Items.ProfileCard = MakeFrame({
         end
 
         Separator()
-        local GameStat = Stat("...")
+        local GameStat = Stat(Params.Name or "Diarian")
         Separator()
         local FpsStat = Stat("0 fps")
         Separator()
         local PingStat = Stat("0 ms")
         Separator()
         local TimeStat = Stat(os.date("%I:%M %p"))
-
-        Library:Thread(function()
-            local Ok, Info = pcall(function()
-                return MarketplaceService:GetProductInfo(game.PlaceId)
-            end)
-
-            GameStat.Instance.Text = (Ok and Info and Info.Name) or "Unknown"
-        end)
 
         local Frames = 0
 
