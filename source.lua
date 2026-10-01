@@ -2770,7 +2770,6 @@ end
         local Window = {
             Name = Params.Name or "diarian",
             Icon = Params.Icon or Library.BrandIcon or "layers",
-            -- Visual logo used in the top bar (Nexonix-style).
             Logo = Params.Logo or Params.logo or "rbxassetid://91770633749640",
             IsOpen = true,
             Tabs = { },
@@ -2784,6 +2783,7 @@ end
 
 
         Library.BrandIcon = Window.Icon
+        Library.BrandLogo = Window.Logo
         Library:SetAccent(Library.BrandAccent)
 
         local Items = { }
@@ -2856,7 +2856,6 @@ end
             Z = 3
         })
 
-        -- Larger standalone logo, matching the cleaner Nexonix header treatment.
         Items.HubIcon = MakeImage({
             Parent = Items.TopBar.Instance,
             Icon = Window.Logo,
@@ -3413,10 +3412,10 @@ Items.ProfileCard = MakeFrame({
         if WindowMobile and Params.MobileButton ~= false then
             local MobileHost = MakeFrame({
                 Parent = Library.Holder.Instance,
-                Pos = UDim2.fromOffset(10, 4),
+                Pos = UDim2.fromOffset(8, 4),
                 Size = UDim2.fromOffset(48, 48),
                 Color = "Section",
-                Round = 12,
+                Round = 10,
                 Z = 90
             })
 
@@ -3435,7 +3434,7 @@ Items.ProfileCard = MakeFrame({
 
             Library:Create("UICorner", {
                 Parent = MobileIcon.Instance,
-                CornerRadius = UDim.new(0, 9)
+                CornerRadius = UDim.new(0, 8)
             })
 
             local MobileHit = MakeButton({
@@ -3443,11 +3442,48 @@ Items.ProfileCard = MakeFrame({
                 Z = 92
             })
 
-            MobileHit:Connect("MouseButton1Down", function()
-                Window:SetOpen(not Window.IsOpen)
+            local Dragging = false
+            local DragMoved = false
+            local DragStart
+            local StartPosition
+            local ActiveInput
+
+            Library:Connect(MobileHit.Instance.InputBegan, function(Input)
+                if Input.UserInputType ~= Enum.UserInputType.MouseButton1 and Input.UserInputType ~= Enum.UserInputType.Touch then return end
+                Dragging = true
+                DragMoved = false
+                DragStart = Input.Position
+                StartPosition = MobileHost.Instance.Position
+                ActiveInput = Input
             end)
 
-            MobileHost:MakeDraggable(MobileHost.Instance)
+            Library:Connect(UserInputService.InputChanged, function(Input)
+                if not Dragging or not ActiveInput then return end
+                if Input.UserInputType ~= Enum.UserInputType.MouseMovement and Input.UserInputType ~= Enum.UserInputType.Touch then return end
+                local Delta = Input.Position - DragStart
+                if Delta.Magnitude >= 6 then
+                    DragMoved = true
+                end
+                if DragMoved then
+                    MobileHost.Instance.Position = UDim2.new(
+                        StartPosition.X.Scale,
+                        StartPosition.X.Offset + Delta.X,
+                        StartPosition.Y.Scale,
+                        StartPosition.Y.Offset + Delta.Y
+                    )
+                end
+            end)
+
+            Library:Connect(UserInputService.InputEnded, function(Input)
+                if not Dragging then return end
+                if Input.UserInputType ~= Enum.UserInputType.MouseButton1 and Input.UserInputType ~= Enum.UserInputType.Touch then return end
+                Dragging = false
+                ActiveInput = nil
+                if not DragMoved then
+                    Window:SetOpen(not Window.IsOpen)
+                end
+            end)
+
             Items.MobileButton = MobileHost
             Items.MobileButtonIcon = MobileIcon
         end
@@ -3640,7 +3676,6 @@ Items.ProfileCard = MakeFrame({
         local Index = #Window.Tabs
         local RowY = 10 + Index * 50
 
-        -- Nexonix-style tab: rounded icon tile with an accent shell when selected.
         Items.Row = MakeFrame({
             Parent = Window.Items.Rail.Instance,
             Pos = UDim2.fromOffset(10, RowY),
@@ -5508,12 +5543,34 @@ Items.ProfileCard = MakeFrame({
             Report()
         end
 
+        local function AddDropdownOption(Option)
+            local Name = type(Option) == "table" and (Option.Name or Option.Text or Option.Value) or Option
+            local Color = type(Option) == "table" and Option.Color or nil
+            Name = tostring(Name)
+            local Data = Popup:AddRow(Name)
+            Data.Option = Option
+            Data.Color = Color
+            if typeof(Color) == "Color3" then
+                local Dot = MakeFrame({
+                    Parent = Data.Row.Instance,
+                    Anchor = Vector2.new(1, 0.5),
+                    Pos = UDim2.new(1, -9, 0.5, 0),
+                    Size = UDim2.fromOffset(8, 8),
+                    Raw = Color,
+                    Round = 8,
+                    Z = 50
+                })
+                Data.ColorDot = Dot
+            end
+            return Data
+        end
+
         function Dropdown:Refresh(List)
             Popup:Clear()
             Dropdown.Options = List
 
             for _, Option in List do
-                Popup:AddRow(tostring(Option))
+                AddDropdownOption(Option)
             end
         end
 
@@ -5556,7 +5613,7 @@ Items.ProfileCard = MakeFrame({
         HoverSwap(Items.Box)
 
         for _, Option in Dropdown.Options do
-            Popup:AddRow(tostring(Option))
+            AddDropdownOption(Option)
         end
 
         if Dropdown.Default ~= nil then
@@ -6733,7 +6790,7 @@ Items.ProfileCard = MakeFrame({
             return Library.WatermarkBar
         end
 
-        local Icon = Params.Icon or "rbxassetid://91770633749640"
+        local Icon = Params.Icon or Library.BrandLogo or "rbxassetid://91770633749640"
         local Items = { }
         local Order = 0
 
@@ -6846,9 +6903,8 @@ Items.ProfileCard = MakeFrame({
         local Watermark = { Instance = Items.Bar.Instance }
 
         function Watermark:SetIcon(NewIcon)
-            Library.BrandIcon = NewIcon
+            Library.BrandLogo = NewIcon
             ApplyIcon(Items.Icon.Instance, NewIcon)
-
             pcall(function()
                 Items.Icon.Instance.ImageColor3 = Color3.fromRGB(255, 255, 255)
             end)
