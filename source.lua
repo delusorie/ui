@@ -2770,8 +2770,8 @@ end
         local Window = {
             Name = Params.Name or "diarian",
             Icon = Params.Icon or Library.BrandIcon or "layers",
-            -- Visual logo used in the top bar (Nexonix-style).
-            Logo = Params.Logo or Params.logo or "rbxassetid://107851222063839",
+            -- Visual logo
+            Logo = Params.Logo or Params.logo or "rbxassetid://91770633749640",
             IsOpen = true,
             Tabs = { },
             Current = nil,
