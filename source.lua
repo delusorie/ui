@@ -2770,6 +2770,8 @@ end
         local Window = {
             Name = Params.Name or "diarian",
             Icon = Params.Icon or Library.BrandIcon or "layers",
+            -- Visual logo used in the top bar (Nexonix-style).
+            Logo = Params.Logo or Params.logo or "rbxassetid://77749228793011",
             IsOpen = true,
             Tabs = { },
             Current = nil,
@@ -2854,29 +2856,40 @@ end
             Z = 3
         })
 
+        -- Larger standalone logo, matching the cleaner Nexonix header treatment.
         Items.HubIcon = MakeImage({
             Parent = Items.TopBar.Instance,
-            Icon = 104824991042380,
-            Pos = UDim2.fromOffset(10, 10),
-            Size = UDim2.fromOffset(30, 30),
+            Icon = Window.Logo,
+            Pos = UDim2.fromOffset(12, 6),
+            Size = UDim2.fromOffset(40, 40),
             Raw = Color3.new(1, 1, 1),
             Fit = true,
+            Z = 3
+        })
+        Corner(Items.HubIcon.Instance, 6)
+
+        Items.LogoDivider = MakeFrame({
+            Parent = Items.TopBar.Instance,
+            Pos = UDim2.fromOffset(67, 13),
+            Size = UDim2.fromOffset(2, 25),
+            Color = "Element",
+            Round = 2,
             Z = 3
         })
 
         Items.Search = MakeFrame({
             Parent = Items.TopBar.Instance,
-            Pos = UDim2.fromOffset(50, 11),
-            Size = UDim2.fromOffset(280, 30),
+            Pos = UDim2.fromOffset(84, 6),
+            Size = UDim2.fromOffset(300, 40),
             Color = "Element",
-            Round = 5,
+            Round = 10,
             Z = 3
         })
 
         MakeImage({
             Parent = Items.Search.Instance,
             Icon = "search",
-            Pos = UDim2.fromOffset(7, 7),
+            Pos = UDim2.fromOffset(12, 12),
             Size = UDim2.fromOffset(16, 16),
             Color = "DimText",
             Z = 4
@@ -2885,8 +2898,8 @@ end
         Items.SearchBox = MakeInput({
             Parent = Items.Search.Instance,
             Placeholder = "search",
-            Pos = UDim2.fromOffset(30, -1),
-            Size = UDim2.new(1, -38, 1, 0),
+            Pos = UDim2.fromOffset(42, 0),
+            Size = UDim2.new(1, -50, 1, 0),
             TextSize = 15,
             Z = 4
         })
@@ -3619,23 +3632,34 @@ Items.ProfileCard = MakeFrame({
         local Index = #Window.Tabs
         local RowY = 10 + Index * 50
 
+        -- Nexonix-style tab: rounded icon tile with an accent shell when selected.
         Items.Row = MakeFrame({
             Parent = Window.Items.Rail.Instance,
             Pos = UDim2.fromOffset(10, RowY),
-            Size = UDim2.fromOffset(40, 40),
-            Color = "Element",
-            Round = 8,
+            Size = UDim2.fromOffset(41, 45),
+            Color = "Accent",
+            Round = 14,
             Clip = true,
             Z = 3
         })
 
         SetRest(Items.Row.Instance, "BackgroundTransparency", 1)
 
+        Items.Inner = MakeFrame({
+            Parent = Items.Row.Instance,
+            Pos = UDim2.fromOffset(1, 1),
+            Size = UDim2.new(1, -2, 1, -2),
+            Color = "Element",
+            Round = 14,
+            Clip = true,
+            Z = 4
+        })
+
         Items.Bar = MakeFrame({
             Parent = Window.Items.Rail.Instance,
             Anchor = Vector2.new(0, 0.5),
-            Pos = UDim2.new(0, 0, 0, RowY + 20),
-            Size = UDim2.fromOffset(3, 0),
+            Pos = UDim2.new(0, 0, 0, RowY + 22),
+            Size = UDim2.fromOffset(0, 0),
             Color = "Accent",
             Round = 4,
             Z = 4
@@ -3653,17 +3677,18 @@ Items.ProfileCard = MakeFrame({
         end
 
         Items.Icon = MakeImage({
-            Parent = Items.Row.Instance,
+            Parent = Items.Inner.Instance,
             Icon = Tab.Icon,
-            Pos = UDim2.fromOffset(10, 10),
-            Size = UDim2.fromOffset(20, 20),
+            Anchor = Vector2.new(0.5, 0.5),
+            Pos = UDim2.new(0.5, 0, 0.5, 0),
+            Size = UDim2.fromOffset(22, 22),
             Color = "DimIcon",
-            Z = 4
+            Z = 5
         })
 
         Items.Hit = MakeButton({
             Parent = Items.Row.Instance,
-            Z = 6
+            Z = 7
         })
 
         Items.SubRow = Library:Create("ScrollingFrame", {
@@ -3716,6 +3741,7 @@ Items.ProfileCard = MakeFrame({
             Tab.Active = Active
 
             Library:StampResting(Items.Row.Instance, "BackgroundTransparency", Active and 0 or 1)
+            Library:StampResting(Items.Inner.Instance, "BackgroundTransparency", 0)
 
             if Items.BarShadow then
                 Library:StampResting(Items.BarShadow, "Transparency", Active and 0 or 1)
@@ -3728,15 +3754,18 @@ Items.ProfileCard = MakeFrame({
             })
 
             Items.Row:Tween({ BackgroundTransparency = Active and 0 or 1 })
-            Items.Bar:Tween({ Size = UDim2.fromOffset(3, Active and 16 or 0) })
+            Items.Inner:Tween({ BackgroundColor3 = Active and Library.Theme.Section or Library.Theme.Element })
+            Items.Bar:Tween({ Size = UDim2.fromOffset(0, 0) })
         end
 
         Items.Row:OnHover(function()
             if Tab.Active then return end
             Items.Icon:Tween({ ImageColor3 = Library.Theme.Text })
+            Items.Inner:Tween({ BackgroundColor3 = Library.Theme.Hover })
         end, function()
             if Tab.Active then return end
             Items.Icon:Tween({ ImageColor3 = Library.Theme.DimIcon })
+            Items.Inner:Tween({ BackgroundColor3 = Library.Theme.Element })
         end)
 
         local function EnterFirstSub()
