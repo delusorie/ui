@@ -1089,109 +1089,18 @@ end
     Library.MakeDraggable = function(Self, Handle)
         local Gui = Self.Instance
         Handle = Handle or Gui
-        if not Gui or not Handle then return end
+        if not Gui then return end
 
         pcall(function()
-            Handle.Active = true
+            Gui.Active = true
+            Gui.Draggable = true
         end)
 
-        local Dragging = false
-        local DragStart
-        local StartPosition
-        local InputChanged
-
-        local function GetParentAndGuiSize()
-            local Parent = SafeGetProperty(Gui, "Parent")
-            local _, ParentSize = SafeRect(Parent)
-            local _, GuiSize = SafeRect(Gui)
-
-            if not ParentSize or not GuiSize then
-                return nil, nil
-            end
-
-            local Scale = math.max(Library:GetScreenScale(), 0.001)
-            return ParentSize / Scale, GuiSize / Scale
-        end
-
-        local function Set(Input)
-            if not DragStart or not StartPosition then return end
-
-            local Scale = math.max(Library:GetScreenScale(), 0.001)
-            local DragDelta = (Input.Position - DragStart) / Scale
-            local NewX = StartPosition.X + DragDelta.X
-            local NewY = StartPosition.Y + DragDelta.Y
-
-            local ScreenSize, GuiSize = GetParentAndGuiSize()
-            if ScreenSize and GuiSize then
-                local Anchor = Gui.AnchorPoint
-                NewX = math.clamp(
-                    NewX,
-                    GuiSize.X * Anchor.X,
-                    math.max(ScreenSize.X - GuiSize.X * (1 - Anchor.X), GuiSize.X * Anchor.X)
-                )
-                NewY = math.clamp(
-                    NewY,
-                    GuiSize.Y * Anchor.Y,
-                    math.max(ScreenSize.Y - GuiSize.Y * (1 - Anchor.Y), GuiSize.Y * Anchor.Y)
-                )
-            end
-
-            local Info = IsMobile
-                and TweenInfo.new(0.06, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-                or TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
-            Self:Tween({ Position = UDim2.fromOffset(NewX, NewY) }, Info)
-        end
-
-        Library:Connect(Handle.InputBegan, function(Input)
-            local IsClick = Input.UserInputType == Enum.UserInputType.MouseButton1
-            local IsTouch = Input.UserInputType == Enum.UserInputType.Touch
-
-            if not IsClick and not IsTouch then return end
-            if IsOverAnyPopup() then return end
-
-            Dragging = true
-            DragStart = Input.Position
-
-            local ParentSize = select(1, GetParentAndGuiSize())
-            if not ParentSize then
-                Dragging = false
-                return
-            end
-
-            StartPosition = Vector2.new(
-                Gui.Position.X.Scale * ParentSize.X + Gui.Position.X.Offset,
-                Gui.Position.Y.Scale * ParentSize.Y + Gui.Position.Y.Offset
-            )
-
-            if InputChanged then return end
-
-            local Ok, Conn = pcall(function()
-                return Input.Changed:Connect(function()
-                    if Input.UserInputState == Enum.UserInputState.End then
-                        Dragging = false
-                        if InputChanged then
-                            InputChanged:Disconnect()
-                            InputChanged = nil
-                        end
-                    end
-                end)
+        if Handle and Handle ~= Gui then
+            pcall(function()
+                Handle.Active = true
             end)
-
-            if Ok then
-                InputChanged = Conn
-                Library:RegisterExternalConnection(Conn)
-            end
-        end)
-
-        Library:Connect(UserInputService.InputChanged, function(Input)
-            local IsMove = Input.UserInputType == Enum.UserInputType.MouseMovement
-            local IsTouch = Input.UserInputType == Enum.UserInputType.Touch
-
-            if (IsMove or IsTouch) and Dragging then
-                Set(Input)
-            end
-        end)
+        end
     end
 
     Library.Unload = function(Self)
