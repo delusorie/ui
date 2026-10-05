@@ -3910,7 +3910,7 @@ Items.ProfileCard = MakeFrame({
                     Y += Section.Height + 16
                 end
 
-                SafeSetProperty(Scroll.Instance, "CanvasSize", UDim2.fromOffset(0, math.max(Y - 16, 0))
+                SafeSetProperty(Scroll.Instance, "CanvasSize", UDim2.fromOffset(0, math.max(Y - 16, 0)))
             end
 
             return Column
