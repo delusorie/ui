@@ -3906,11 +3906,11 @@ Items.ProfileCard = MakeFrame({
 
                 for _, Section in Column.Sections do
                     Section.Y = Y
-                    Section.Items.Holder.Instance.Position = UDim2.fromOffset(0, Y)
+                    SafeSetProperty(Section.Items.Holder.Instance, "Position", UDim2.fromOffset(0, Y))
                     Y += Section.Height + 16
                 end
 
-                Scroll.Instance.CanvasSize = UDim2.fromOffset(0, math.max(Y - 16, 0))
+                SafeSetProperty(Scroll.Instance, "CanvasSize", UDim2.fromOffset(0, math.max(Y - 16, 0))
             end
 
             return Column
@@ -4305,22 +4305,22 @@ Items.ProfileCard = MakeFrame({
             for _, Data in Section.Rows do
                 local Shown = Data.Visible ~= false
 
-                Data.Frame.Instance.Visible = Shown
+                SafeSetProperty(Data.Frame.Instance, "Visible", Shown)
 
                 if not Shown then continue end
 
                 Data.Y = Y
-                Data.Frame.Instance.Position = UDim2.fromOffset(0, Y)
+                SafeSetProperty(Data.Frame.Instance, "Position", UDim2.fromOffset(0, Y))
                 Y += Data.Height
                 Visible += 1
             end
 
             local FrameHeight = Visible > 0 and (Y + 8) or 0
 
-            Items.Frame.Instance.Size = UDim2.fromOffset(Section.Width, FrameHeight)
-            Items.Holder.Instance.Visible = Visible > 0
+            SafeSetProperty(Items.Frame.Instance, "Size", UDim2.fromOffset(Section.Width, FrameHeight))
+            SafeSetProperty(Items.Holder.Instance, "Visible", Visible > 0)
             Section.Height = Visible > 0 and (26 + FrameHeight) or 0
-            Items.Holder.Instance.Size = UDim2.fromOffset(Section.Width, math.max(Section.Height, 1))
+            SafeSetProperty(Items.Holder.Instance, "Size", UDim2.fromOffset(Section.Width, math.max(Section.Height, 1)))
 
             Column:Reflow()
         end
