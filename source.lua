@@ -695,7 +695,8 @@ end
     end
 
     Library.Round = function(Self, Number, Float)
-        Float = Float or 1
+        Float = tonumber(Float) or 1
+        if Float <= 0 then Float = 1 end
 
         local Result = math.floor(Number / Float + 0.5) * Float
         local Places = math.max(0, math.ceil(-math.log(Float, 10)))
@@ -1075,9 +1076,11 @@ end
 
     local function IsOverAnyPopup()
         for Panel in Library.TouchShields do
-            if not Panel.Parent then continue end
-            if not Panel.Visible then continue end
-            if IsOverObject(Panel) then return true end
+            local Parent = SafeGetProperty(Panel, "Parent", nil)
+            local Visible = SafeGetProperty(Panel, "Visible", false)
+            if Parent and Visible and IsOverObject(Panel) then
+                return true
+            end
         end
 
         return false
