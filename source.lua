@@ -295,7 +295,7 @@ end
     end
 
     Library.__index = Library
-    Library.Version = "1.6.0-smooth-keybinds"
+    Library.Version = "1.5.5-capability-clean"
     Library.IsMobile = IsMobile
     Library.DevicePlatform = DevicePlatform
     Library.WindowWidth = IsMobile and 640 or 716
@@ -427,9 +427,6 @@ end
     Library.AccentShadows = { }
     Library.OpenFrames = { }
     Library.Windows = { }
-    Library.KeybindEntries = { }
-    Library.KeybindListController = nil
-    Library.DraggableBindings = setmetatable({}, { __mode = "k" })
     Library.Notifs = { }
     Library.TouchButtons = { }
     Library.TouchShields = { }
@@ -999,31 +996,14 @@ end
         for _, Shadow in Library.AccentShadows do
             SafeSetProperty(Shadow, "Color", Library.Theme.Accent)
         end
-        for _, Data in ipairs(Library.Shimmers or {}) do
-            local Gradient = Data.Gradient
-            if Gradient and Gradient.Parent then
-                Gradient.Color = ColorSequence.new({
-                    ColorSequenceKeypoint.new(0, Library.Theme.Accent:Lerp(Color3.new(1, 1, 1), 0.08)),
-                    ColorSequenceKeypoint.new(0.48, Color3.new(1, 1, 1)),
-                    ColorSequenceKeypoint.new(1, Library.Theme.Accent:Lerp(Color3.new(1, 1, 1), 0.08))
-                })
-            end
-        end
-        if Library.KeybindListController and Library.KeybindListController.Stroke then
-            Library.KeybindListController.Stroke.Color = Library.Theme.Accent
-        end
     end
 
     Library.SetAccent = function(Self, Color)
-        if typeof(Color) ~= "Color3" then
-            return false
-        end
 
-        Library.BrandAccent = Color
+        Color = Library.BrandAccent
         Library.Theme.Accent = Color
         DeriveTheme()
         Library.ThemeDirty = true
-        return true
     end
 
     Library.SetThemeColor = function(Self, Key, Color)
@@ -1106,121 +1086,21 @@ end
         return false
     end
 
-    -- Drag system with mouse/touch support, screen clamping and a short release glide.
-    -- Every connection is registered through Library:Connect so Unload() cleans it up.
-    Library.MakeDraggable = function(Self, Handle, Options)
-        -- Accept both Diarian wrapper objects ({ Instance = ... }) and raw Roblox Instances.
-        -- Accessing .Instance directly on a raw Frame causes:
-        -- "Instance is not a valid member of Frame".
-        local Gui
-        if typeof(Self) == "Instance" then
-            Gui = Self
-        elseif type(Self) == "table" then
-            local Ok, Wrapped = pcall(function()
-                return Self.Instance
-            end)
-            Gui = (Ok and Wrapped) or nil
-        end
-
-        if typeof(Handle) == "Instance" then
-            -- Already a raw GuiObject; keep it unchanged.
-        elseif type(Handle) == "table" then
-            local Ok, Wrapped = pcall(function()
-                return Handle.Instance
-            end)
-            if Ok and Wrapped then Handle = Wrapped end
-        end
+    Library.MakeDraggable = function(Self, Handle)
+        local Gui = Self.Instance
         Handle = Handle or Gui
-        Options = Options or {}
-        if not Gui or not Handle then return end
-        local Bindings = Library.DraggableBindings[Gui]
-        if not Bindings then
-            Bindings = setmetatable({}, { __mode = "k" })
-            Library.DraggableBindings[Gui] = Bindings
-        end
-        if Bindings[Handle] then return end
-        Bindings[Handle] = true
+        if not Gui then return end
 
-        pcall(function() Handle.Active = true end)
-
-        local Dragging = false
-        local DragInput = nil
-        local StartInput = nil
-        local StartPosition = nil
-        local LastPoint = nil
-        local LastClock = 0
-        local Velocity = Vector2.zero
-        local GlideTween = nil
-
-        local function Scale()
-            return math.max(Library:GetScreenScale(), 0.1)
-        end
-
-        local function ClampPosition(Position)
-            if Options.Clamp == false then return Position end
-            local Camera = workspace.CurrentCamera
-            if not Camera then return Position end
-            local Viewport = Camera.ViewportSize
-            local S = Scale()
-            local Width = Gui.Size.X.Offset
-            local Height = Gui.Size.Y.Offset
-            local MaxX = math.max(0, Viewport.X / S - Width)
-            local MaxY = math.max(0, (Viewport.Y - GuiInset) / S - Height)
-            return UDim2.fromOffset(math.clamp(Position.X.Offset, 0, MaxX), math.clamp(Position.Y.Offset, 0, MaxY))
-        end
-
-        Library:Connect(Handle.InputBegan, function(Input)
-            if Library.Destroyed then return end
-            if Input.UserInputType ~= Enum.UserInputType.MouseButton1 and Input.UserInputType ~= Enum.UserInputType.Touch then return end
-            if GlideTween then pcall(function() GlideTween:Cancel() end); GlideTween = nil end
-            Dragging = true
-            DragInput = Input
-            StartInput = Input.Position
-            StartPosition = Gui.Position
-            LastPoint = Input.Position
-            LastClock = os.clock()
-            Velocity = Vector2.zero
+        pcall(function()
+            Gui.Active = true
+            Gui.Draggable = true
         end)
 
-        Library:Connect(UserInputService.InputChanged, function(Input)
-            if not Dragging then return end
-            if Input.UserInputType ~= Enum.UserInputType.MouseMovement and Input.UserInputType ~= Enum.UserInputType.Touch then return end
-            if DragInput and DragInput.UserInputType == Enum.UserInputType.Touch and Input ~= DragInput and Input.UserInputType ~= Enum.UserInputType.Touch then return end
-
-            local Now = os.clock()
-            local Point = Input.Position
-            local Delta = (Point - StartInput) / Scale()
-            Gui.Position = ClampPosition(UDim2.fromOffset(StartPosition.X.Offset + Delta.X, StartPosition.Y.Offset + Delta.Y))
-
-            local Elapsed = Now - LastClock
-            if Elapsed > 0 then Velocity = (Point - LastPoint) / Elapsed / Scale() end
-            LastPoint = Point
-            LastClock = Now
-        end)
-
-        local function FinishDrag(Input)
-            if not Dragging then return end
-            if Input and Input.UserInputType ~= Enum.UserInputType.MouseButton1 and Input.UserInputType ~= Enum.UserInputType.Touch then return end
-            Dragging = false
-            DragInput = nil
-            if Options.Glide == false then
-                Gui.Position = ClampPosition(Gui.Position)
-                return
-            end
-
-            local MaxSpeed = 900
-            local Speed = Velocity.Magnitude
-            if Speed < 90 then
-                Gui.Position = ClampPosition(Gui.Position)
-                return
-            end
-            Velocity = Velocity.Unit * math.min(Speed, MaxSpeed) * 0.075
-            local Target = ClampPosition(UDim2.fromOffset(Gui.Position.X.Offset + Velocity.X, Gui.Position.Y.Offset + Velocity.Y))
-            GlideTween = TweenService:Create(Gui, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = Target})
-            GlideTween:Play()
+        if Handle and Handle ~= Gui then
+            pcall(function()
+                Handle.Active = true
+            end)
         end
-
-        Library:Connect(UserInputService.InputEnded, FinishDrag)
     end
 
     Library.Unload = function(Self)
@@ -1243,17 +1123,6 @@ end
             pcall(coroutine.close, Thread)
             pcall(task.cancel, Thread)
         end
-
-        for _, Data in ipairs(Library.Shimmers or {}) do
-            pcall(function() Data.Tween:Cancel() end)
-            pcall(function() Data.Gradient:Destroy() end)
-        end
-        table.clear(Library.Shimmers or {})
-
-        if Library.KeybindListController then
-            pcall(function() Library.KeybindListController:Destroy() end)
-        end
-        table.clear(Library.KeybindEntries)
 
         for _, Object in Library.ExternalInstances do
             pcall(function()
@@ -1401,177 +1270,6 @@ end
             ZIndex = Params.Z or 1,
             BorderSizePixel = 0
         }):AddToTheme({ TextColor3 = Params.Color or "Text" })
-    end
-
-    Library.Shimmers = {}
-    function Library:AddShimmer(Target, Duration)
-        local Object = Target and (Target.Instance or Target)
-        if not Object or not Object:IsA("TextLabel") then return nil end
-        local Gradient = Instance.new("UIGradient")
-        local Accent = Library.Theme.Accent
-        Gradient.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Accent:Lerp(Color3.new(1, 1, 1), 0.08)),
-            ColorSequenceKeypoint.new(0.48, Color3.new(1, 1, 1)),
-            ColorSequenceKeypoint.new(1, Accent:Lerp(Color3.new(1, 1, 1), 0.08))
-        })
-        Gradient.Offset = Vector2.new(-1, 0)
-        Gradient.Parent = Object
-        local Tween = TweenService:Create(Gradient, TweenInfo.new(math.max(tonumber(Duration) or 2.4, 0.8), Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1, false), { Offset = Vector2.new(1, 0) })
-        Tween:Play()
-        table.insert(Library.Shimmers, {Gradient = Gradient, Tween = Tween})
-        return Gradient
-    end
-
-    -- Floating keybind list. It observes the existing Toggle:Keybind objects; it does not
-    -- replace key capture, toggle callbacks, or the existing flag/config system.
-    local function RenderKeybindList()
-        local Controller = Library.KeybindListController
-        if not Controller or Controller.Destroyed or not Controller.Root or not Controller.Root.Parent then return end
-
-        if Controller.Collapsed then
-            for _, Entry in ipairs(Library.KeybindEntries) do
-                if Entry.Row then Entry.Row.Visible = false end
-            end
-            Controller.Empty.Visible = false
-            Controller.Root.Size = UDim2.fromOffset(Controller.Width, 34)
-            return
-        end
-
-        local VisibleCount = 0
-        local RowHeight = 29
-        local Y = 37
-        for _, Entry in ipairs(Library.KeybindEntries) do
-            local Keybind = Entry.Keybind
-            local HasKey = Keybind and Keybind.Key ~= nil and tostring(Keybind.Key) ~= "Unknown" and tostring(Keybind.Key) ~= "None"
-            local IsVisible = HasKey and Entry.Visible ~= false
-            if IsVisible then
-                VisibleCount += 1
-                if not Entry.Row or not Entry.Row.Parent then
-                    Entry.Row = MakeFrame({ Parent = Controller.Root, Pos = UDim2.fromOffset(8, Y), Size = UDim2.new(1, -16, 0, RowHeight), Color = "Element", Round = 6, Z = 93 }).Instance
-                    Entry.Dot = MakeFrame({ Parent = Entry.Row, Pos = UDim2.fromOffset(7, 10), Size = UDim2.fromOffset(8, 8), Color = "DimText", Round = 5, Z = 94 }).Instance
-                    Entry.NameLabel = MakeText({ Parent = Entry.Row, Text = Entry.Name, TextSize = 12, Pos = UDim2.fromOffset(22, 0), Size = UDim2.new(1, -92, 1, 0), Color = "DimText", Truncate = true, Z = 94 }).Instance
-                    Entry.KeyChip = MakeFrame({ Parent = Entry.Row, Anchor = Vector2.new(1, 0.5), Pos = UDim2.new(1, -5, 0.5, 0), Size = UDim2.fromOffset(62, 21), Color = "Light", Round = 5, Z = 94 }).Instance
-                    Entry.KeyLabel = MakeText({ Parent = Entry.KeyChip, Text = "NONE", TextSize = 10, Size = UDim2.new(1, -4, 1, 0), Color = "Text", Align = Enum.TextXAlignment.Center, Truncate = true, Z = 95 }).Instance
-                end
-                Entry.Row.Visible = true
-                Entry.Row.Position = UDim2.fromOffset(8, Y)
-                local ModeSuffix = (Keybind.Mode and Keybind.Mode ~= "Toggle") and ("  [" .. string.upper(tostring(Keybind.Mode)) .. "]") or ""
-                Entry.NameLabel.Text = tostring(Entry.Name or "Keybind") .. ModeSuffix
-                Entry.KeyLabel.Text = string.upper(tostring(Keybind.Key or "None")):gsub("ENUM.KEYCODE.", "")
-                local Active = Keybind.Independent and Keybind.Active or (Entry.Toggle and Entry.Toggle.Value) or false
-                Entry.Dot.BackgroundColor3 = Active and Library.Theme.Accent or Library.Theme.DimText
-                Entry.NameLabel.TextColor3 = Active and Library.Theme.Text or Library.Theme.DimText
-                Entry.KeyChip.BackgroundColor3 = Active and Library.Theme.AccentSoft or Library.Theme.Light
-                Entry.KeyLabel.TextColor3 = Active and Library.Theme.Accent or Library.Theme.Text
-                Y += RowHeight + 4
-            elseif Entry.Row then
-                Entry.Row.Visible = false
-            end
-        end
-
-        Controller.Root.Size = UDim2.fromOffset(Controller.Width, math.max(43, Y + 5))
-        Controller.Empty.Visible = VisibleCount == 0
-        Controller.Empty.Position = UDim2.fromOffset(12, 40)
-        Controller.Empty.Size = UDim2.new(1, -24, 0, 20)
-    end
-
-    function Library:RegisterKeybindEntry(Keybind, Name, Toggle)
-        if not Keybind then return end
-        local Entry = Keybind._DiariListEntry
-        if not Entry then
-            Entry = { Keybind = Keybind, Name = Name or "Keybind", Toggle = Toggle, Visible = true }
-            Keybind._DiariListEntry = Entry
-            table.insert(Library.KeybindEntries, Entry)
-        else
-            Entry.Name = Name or Entry.Name
-            Entry.Toggle = Toggle or Entry.Toggle
-        end
-        RenderKeybindList()
-    end
-
-    function Library:UpdateKeybindEntry(Keybind, Flash)
-        local Entry = Keybind and Keybind._DiariListEntry
-        if Entry and Flash and Entry.Row and Entry.Row.Parent then
-            local Active = Keybind.Independent and Keybind.Active or (Entry.Toggle and Entry.Toggle.Value) or false
-            local Target = Active and Library.Theme.AccentSoft or Library.Theme.Element
-            Entry.Row.BackgroundColor3 = Library.Theme.Accent
-            TweenService:Create(Entry.Row, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { BackgroundColor3 = Target }):Play()
-        end
-        if Entry then RenderKeybindList() end
-    end
-
-    function Library:CreateKeybindList(Params)
-        Params = Params or {}
-        if Library.KeybindListController and not Library.KeybindListController.Destroyed then
-            return Library.KeybindListController
-        end
-
-        local Width = math.clamp(tonumber(Params.Width) or 220, 180, 340)
-        local Root = MakeFrame({
-            Parent = Library.Holder.Instance,
-            Pos = Params.Position or UDim2.new(1, -Width - 24, 0.35, 0),
-            Size = UDim2.fromOffset(Width, 43),
-            Color = "Background",
-            Round = 9,
-            Clip = true,
-            Z = 90
-        })
-        Root.Instance.BackgroundTransparency = 0.04
-        local Stroke = Instance.new("UIStroke")
-        Stroke.Thickness = 1
-        Stroke.Transparency = 0.22
-        Stroke.Color = Library.Theme.Accent
-        Stroke.Parent = Root.Instance
-
-        local Header = MakeFrame({ Parent = Root.Instance, Pos = UDim2.fromOffset(0, 0), Size = UDim2.new(1, 0, 0, 34), Color = "Section", Z = 91 })
-        MakeFrame({ Parent = Header.Instance, Pos = UDim2.fromOffset(10, 12), Size = UDim2.fromOffset(4, 10), Color = "Accent", Round = 3, Z = 92 })
-        local ListTitle = MakeText({ Parent = Header.Instance, Text = Params.Title or "KEYBINDS", TextSize = 12, Bold = true, Pos = UDim2.fromOffset(22, 0), Size = UDim2.new(1, -54, 1, 0), Color = "Text", Truncate = true, Z = 92 })
-        Library:AddShimmer(ListTitle, 3.0)
-        local ToggleButton = Instance.new("TextButton")
-        ToggleButton.Name = "KeybindListToggle"
-        ToggleButton.BackgroundTransparency = 1
-        ToggleButton.Text = "–"
-        ToggleButton.TextSize = 18
-        ToggleButton.TextColor3 = Library.Theme.DimText
-        ToggleButton.Font = Enum.Font.GothamMedium
-        ToggleButton.AnchorPoint = Vector2.new(1, 0.5)
-        ToggleButton.Position = UDim2.new(1, -9, 0.5, 0)
-        ToggleButton.Size = UDim2.fromOffset(22, 25)
-        ToggleButton.ZIndex = 93
-        ToggleButton.Parent = Header.Instance
-        local Empty = MakeText({ Parent = Root.Instance, Text = "Nenhum atalho ativo", TextSize = 11, Pos = UDim2.fromOffset(12, 40), Size = UDim2.new(1, -24, 0, 20), Color = "DimText", Z = 92 }).Instance
-
-        local Controller = {
-            Root = Root.Instance,
-            Width = Width,
-            Empty = Empty,
-            Stroke = Stroke,
-            Collapsed = false,
-            Destroyed = false
-        }
-        function Controller:SetVisible(Value)
-            self.Root.Visible = Value and true or false
-        end
-        function Controller:Toggle()
-            self:SetVisible(not self.Root.Visible)
-        end
-        function Controller:SetPosition(Position)
-            if typeof(Position) == "UDim2" then self.Root.Position = Position end
-        end
-        function Controller:Destroy()
-            self.Destroyed = true
-            if self.Root then self.Root:Destroy() end
-            if Library.KeybindListController == self then Library.KeybindListController = nil end
-        end
-        Library:Connect(ToggleButton.Activated, function()
-            Controller.Collapsed = not Controller.Collapsed
-            ToggleButton.Text = Controller.Collapsed and "+" or "–"
-            RenderKeybindList()
-        end)
-        Library.KeybindListController = Controller
-        Library:MakeDraggable(Root, Header)
-        RenderKeybindList()
-        return Controller
     end
 
     local function MakeImage(Params)
@@ -3035,26 +2733,12 @@ end
             Z = 1
         })
 
-        Items.RailDragHandle = MakeFrame({
-            Parent = Items.Rail.Instance,
-            Pos = UDim2.fromOffset(0, 0),
-            Size = UDim2.new(1, 0, 1, 0),
-            Z = 1
-        })
-
 
         Items.TopBar = MakeFrame({
             Parent = Items.Main.Instance,
             Size = UDim2.fromOffset(W, TopH),
             Color = "Section",
             Round = 10,
-            Z = 2
-        })
-
-        Items.DragHandle = MakeFrame({
-            Parent = Items.TopBar.Instance,
-            Pos = UDim2.fromOffset(0, 0),
-            Size = UDim2.new(1, 0, 1, 0),
             Z = 2
         })
 
@@ -3718,8 +3402,8 @@ Items.ProfileCard = MakeFrame({
 
         Window.Items = Items
 
-        Items.Root:MakeDraggable(Items.DragHandle.Instance)
-        Items.Root:MakeDraggable(Items.RailDragHandle.Instance)
+        Items.Root:MakeDraggable(Items.Main.Instance)
+        Items.Root:MakeDraggable(Items.Rail.Instance)
 
         table.insert(Library.Windows, Window)
 
@@ -4838,11 +4522,6 @@ Items.ProfileCard = MakeFrame({
             end
 
             Toggle.SetVisual(Toggle.Value, false)
-            for _, Entry in ipairs(Library.KeybindEntries) do
-                if Entry.Toggle == Toggle then
-                    Library:UpdateKeybindEntry(Entry.Keybind)
-                end
-            end
             Library:SafeCall(Toggle.Callback, Toggle.Value)
         end
 
@@ -5068,7 +4747,6 @@ Items.ProfileCard = MakeFrame({
                 else
                     Toggle:Set(Keybind.Active)
                 end
-                Library:UpdateKeybindEntry(Keybind, true)
             end
 
             function Keybind:SetMode(Mode, Instant)
@@ -5083,7 +4761,6 @@ Items.ProfileCard = MakeFrame({
                 end
 
                 SaveFlag()
-                Library:UpdateKeybindEntry(Keybind)
             end
 
             function Keybind:Set(Key)
@@ -5092,7 +4769,6 @@ Items.ProfileCard = MakeFrame({
                 Keybind.Picking = false
 
                 SaveFlag()
-                Library:UpdateKeybindEntry(Keybind)
             end
 
             AttachPopup({
@@ -5161,7 +4837,6 @@ Items.ProfileCard = MakeFrame({
 
             Keybind:SetMode(Keybind.Mode, true)
             Keybind:Set(Keybind.Key)
-            Library:RegisterKeybindEntry(Keybind, KParams.ListName or Toggle.Name, Toggle)
 
             local MobileConfig = KParams.MobileButton
             if MobileConfig == true then
@@ -6144,7 +5819,6 @@ Items.ProfileCard = MakeFrame({
         local Keybind = {
             Name = Params.Name or "Keybind",
             Key = Params.Default,
-            Mode = "Press",
             Flag = Params.Flag,
             Callback = Params.Callback or function() end,
             Picking = false,
@@ -6251,7 +5925,6 @@ Items.ProfileCard = MakeFrame({
             if Keybind.Flag then
                 Library.Flags[Keybind.Flag] = Key and tostring(Key) or "None"
             end
-            Library:UpdateKeybindEntry(Keybind)
         end
 
         function Keybind:Get()
@@ -6296,11 +5969,9 @@ Items.ProfileCard = MakeFrame({
             if not KeyMatches(Input, Keybind.Key) then return end
 
             Library:SafeCall(Keybind.Callback, Keybind.Key)
-            Library:UpdateKeybindEntry(Keybind, true)
         end)
 
         Keybind:Set(Keybind.Key)
-        Library:RegisterKeybindEntry(Keybind, Params.ListName or Keybind.Name, nil)
 
         if Keybind.Flag then
             Library.SetFlags[Keybind.Flag] = function(Value)
