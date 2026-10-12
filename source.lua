@@ -1109,8 +1109,28 @@ end
     -- Drag system with mouse/touch support, screen clamping and a short release glide.
     -- Every connection is registered through Library:Connect so Unload() cleans it up.
     Library.MakeDraggable = function(Self, Handle, Options)
-        local Gui = Self and Self.Instance
-        Handle = (Handle and Handle.Instance) or Handle or Gui
+        -- Accept both Diarian wrapper objects ({ Instance = ... }) and raw Roblox Instances.
+        -- Accessing .Instance directly on a raw Frame causes:
+        -- "Instance is not a valid member of Frame".
+        local Gui
+        if typeof(Self) == "Instance" then
+            Gui = Self
+        elseif type(Self) == "table" then
+            local Ok, Wrapped = pcall(function()
+                return Self.Instance
+            end)
+            Gui = (Ok and Wrapped) or nil
+        end
+
+        if typeof(Handle) == "Instance" then
+            -- Already a raw GuiObject; keep it unchanged.
+        elseif type(Handle) == "table" then
+            local Ok, Wrapped = pcall(function()
+                return Handle.Instance
+            end)
+            if Ok and Wrapped then Handle = Wrapped end
+        end
+        Handle = Handle or Gui
         Options = Options or {}
         if not Gui or not Handle then return end
         local Bindings = Library.DraggableBindings[Gui]
